@@ -107,6 +107,25 @@ nav.tabs .fab span{font-size:24px;line-height:1}
 .toggle{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
 .bigtotal{font-size:28px;line-height:1.2}
 
+.stmt{display:flex;flex-direction:column}
+.st-h{font-size:12.5px;color:var(--muted);letter-spacing:.08em;padding:14px 0 4px;border-bottom:1px solid var(--line)}
+.st-h:first-child{padding-top:0}
+.st-r,.st-t,.st-net{display:flex;justify-content:space-between;gap:12px;padding:6px 0}
+.st-r span:first-child,.st-t span:first-child{min-width:0;overflow-wrap:anywhere}
+.st-sub{padding:3px 0 3px 1.2em;font-size:13px;color:var(--muted)}
+.st-t{border-top:1px solid var(--line);font-weight:700}
+.st-net{border-top:2px solid var(--ink);margin-top:10px;padding-top:10px;font-weight:700;font-size:17px}
+.tabs5 button{font-size:13.5px;padding:8px 0}
+.mrow{gap:6px;padding:6px 8px 6px 4px}
+.mrow.sub{padding-left:22px}
+.mmain{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;text-align:left;border:0;background:none;padding:6px 10px;border-radius:8px}
+.mmain .t,.mmain .s{max-width:100%}
+.mv{flex:none;width:34px;height:34px;border:1px solid var(--line);background:var(--surface);border-radius:8px;color:var(--accent);font-size:16px}
+.mv:disabled{opacity:.3;cursor:default}
+.ishidden .t{color:var(--muted);text-decoration:line-through}
+.recrow{gap:12px;cursor:text}
+.recrow input{flex:none;width:9.5em;max-width:45%;border:1px solid var(--line);border-radius:9px;padding:8px 10px;background:var(--bg);text-align:right}
+.addsub{color:var(--accent);font-size:13.5px;padding:10px 14px 10px 32px}
 /* sheet */
 #sheet{position:fixed;inset:0;z-index:20;background:rgba(10,14,22,.45);display:flex;align-items:flex-end;justify-content:center;opacity:0;transition:opacity .18s}
 #sheet.open{opacity:1}
@@ -148,7 +167,169 @@ svg text{fill:var(--muted);font-size:11px;font-family:var(--f-body)}
 <script>
 const SB_URL = 'https://qsfjxgequdpuvuaxeihr.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFzZmp4Z2VxdWRwdXZ1YXhlaWhyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE2NDE2NTksImV4cCI6MjEwNzIxNzY1OX0._uFOLlnuFrrADAKtw48vkTp3dx6zf5Gz4TuZ1WAhui8';
-const sb = supabase.createClient(SB_URL, SB_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
+const real = window.supabase ? supabase.createClient(SB_URL, SB_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } }) : null;
+let sb = real, DEMO = false;
+
+/*DEMO-START — 預覽模式：連不到資料庫時，用記憶體裡的範例資料模擬 Supabase（資料全是假的，不會寫回資料庫） */
+function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function demoSeed() {
+  const L = 'demo-ledger', R = mulberry32(20261011), rnd = (a, b) => Math.round(a + R() * (b - a));
+  const ledgers = [{ id: L, name: '範例帳本', base_currency: 'TWD', created_at: new Date().toISOString() }];
+  const A = (id, name, type, nature, cur = 'TWD') => ({ id, ledger_id: L, name, account_type: type, nature, currency: cur, hidden: false, sort_order: id, memo: null });
+  const accounts = [A(1, '現金', 'cash', 'asset'), A(2, '悠遊付', 'e_wallet', 'asset'), A(3, '台新 Richart', 'bank', 'asset'), A(4, '國泰 CUBE 卡', 'credit_card', 'liability'),
+    A(5, '元大台灣50', 'stock', 'asset'), A(6, '美金現金', 'cash', 'asset', 'USD'), A(7, '應收款項', 'receivable', 'receivable'), A(8, '應付款項', 'payable', 'liability'),
+    A(9, '台積電 2330', 'stock', 'asset')];
+  const categories = []; let cid = 1;
+  const cat = (name, kind, parent = null) => { const c = { id: cid++, ledger_id: L, name, kind, parent_id: parent, sort_order: cid, hidden: false }; categories.push(c); return c.id; };
+  const food = cat('食品酒水', 'expense'), meal = cat('早午晚餐', 'expense', food), snack = cat('水果零食', 'expense', food); cat('煙酒茶', 'expense', food);
+  const home = cat('居家物業', 'expense'), daily = cat('日常用品', 'expense', home), rent = cat('房租', 'expense', home), util = cat('水電瓦斯', 'expense', home);
+  const trans = cat('行車交通', 'expense'), pub = cat('公共交通', 'expense', trans), taxi = cat('打車租車', 'expense', trans);
+  const fun = cat('休閒娛樂', 'expense'), party = cat('玩樂聚會', 'expense', fun); cat('入場門票', 'expense', fun);
+  const cloth = cat('衣服飾品', 'expense'), clothes = cat('衣服褲子', 'expense', cloth); cat('化妝飾品', 'expense', cloth);
+  const inc = cat('收入', 'income'), salary = cat('工資收入', 'income', inc); cat('獎金收入', 'income', inc);
+  const oth = cat('其他收入', 'income'), cashback = cat('信用卡回饋', 'income', oth);
+  const counterparties = ['小美', '阿凱', '室友'].map((name, i) => ({ id: i + 1, ledger_id: L, name, memo: null, hidden: false, sort_order: null }));
+  const transactions = []; let tid = 1;
+  const T = (kind, date, acc, amount, o = {}) => transactions.push({ id: tid++, ledger_id: L, kind, occurred_at: date.toISOString(), account_id: acc, to_account_id: o.to ?? null,
+    amount, to_amount: o.to_amount ?? (o.to ? amount : null), category_id: o.cat ?? null, memo: o.memo ?? null, counterparty_id: o.cp ?? null,
+    quantity: o.qty ?? null, unit_price: o.price ?? null, fee: o.fee ?? null, trade_side: o.side ?? null });
+  const at = (n, h, m = 0) => { const d = new Date(); d.setDate(d.getDate() - n); d.setHours(h, m, 0, 0); return d; };
+  T('opening_balance', at(130, 9), 1, 4000); T('opening_balance', at(130, 9), 2, 500); T('opening_balance', at(130, 9), 3, 68000);
+  T('opening_balance', at(130, 9), 5, 120000); T('opening_balance', at(130, 9), 6, 300);
+  for (let n = 125; n >= 0; n--) {
+    const d = at(n, 12), wd = d.getDay();
+    T('expense', at(n, 12, rnd(0, 50)), R() < .5 ? 1 : 4, rnd(90, 250), { cat: meal, memo: R() < .3 ? '午餐' : null });
+    if (R() < .7) T('expense', at(n, 19, rnd(0, 50)), R() < .5 ? 1 : 4, rnd(120, 450), { cat: meal, memo: R() < .3 ? '晚餐' : null });
+    if (wd > 0 && wd < 6 && R() < .8) T('expense', at(n, 8, rnd(10, 50)), 2, rnd(15, 60), { cat: pub });
+    if (R() < .3) T('expense', at(n, 16, rnd(0, 50)), 1, rnd(30, 150), { cat: snack, memo: R() < .5 ? '手搖飲' : null });
+    if (R() < .1) T('expense', at(n, 15), 4, rnd(100, 800), { cat: daily, memo: '全聯' });
+    if (R() < .07) T('expense', at(n, 21), 4, rnd(500, 1500), { cat: party, memo: 'KTV' });
+    if (R() < .05) T('expense', at(n, 23), 4, rnd(150, 400), { cat: taxi });
+    if (R() < .04) T('expense', at(n, 14), 4, rnd(600, 2500), { cat: clothes });
+    const dom = d.getDate();
+    if (dom === 1) T('expense', at(n, 10), 3, 15000, { cat: rent, memo: `${d.getMonth() + 1} 月房租` });
+    if (dom === 5) T('income', at(n, 9), 3, 52000, { cat: salary, memo: '薪水' });
+    if (dom === 15) T('expense', at(n, 10), 3, rnd(900, 1600), { cat: util });
+    if (dom === 20) T('transfer', at(n, 10), 3, 15000, { to: 4, memo: '繳卡費' });
+    if (dom === 25) T('income', at(n, 10), 4, rnd(120, 300), { cat: cashback });
+  }
+  T('expense', at(80, 15), 6, 25, { cat: meal, memo: '出差午餐' });
+  // 投資：元大台灣50 是匯入的舊部位（只有金額），補登 800 股；台積電完整買賣
+  T('balance_adjustment', at(128, 9), 5, 0, { qty: 800, side: 'buy', memo: '補登股數' });
+  T('transfer', at(45, 10), 3, 16023, { to: 5, qty: 100, price: 160, fee: 23, side: 'buy' });
+  T('transfer', at(100, 10), 3, 19027, { to: 9, qty: 20, price: 950, fee: 27, side: 'buy' });
+  T('transfer', at(60, 10), 3, 10114, { to: 9, qty: 10, price: 1010, fee: 14, side: 'buy' });
+  T('transfer', at(20, 11), 9, 14570.5, { to: 3, to_amount: 16129, qty: 15, price: 1080, fee: 71, side: 'sell', memo: '先賣一半' });
+  T('expense', at(18, 20), 4, -1290, { cat: clothes, memo: '外套退貨' });
+  T('transfer', at(40, 20), 4, 2400, { to: 7, cp: 1, memo: '代墊演唱會門票' });
+  T('transfer', at(22, 21), 7, 1200, { to: 3, cp: 1, memo: '先還一半' });
+  T('transfer', at(33, 13), 8, 3000, { to: 1, cp: 2, memo: '週末錢不夠先借' });
+  T('transfer', at(9, 19), 1, 1000, { to: 8, cp: 2 });
+  T('transfer', at(5, 22), 3, 650, { to: 7, cp: 3, memo: '代墊水電' });
+  T('expense', at(12, 20), 8, 420, { cat: party, cp: 3, memo: '室友先幫我付火鍋' });
+  T('transfer', at(60, 18), 1, 500, { to: 7, memo: '朋友借' });
+  T('transfer', at(50, 18), 7, 500, { to: 1, memo: '朋友還' });
+  T('transfer', at(70, 12), 4, 1800, { to: 7, memo: '團購代墊' });
+  return { ledgers, accounts, categories, counterparties, transactions };
+}
+function makeDemo(empty = false) {
+  const db = demoSeed();
+  if (empty) { db.transactions = []; db.counterparties = []; db.accounts = db.accounts.filter(a => [1, 3, 4, 7, 8].includes(a.id)); db.ledgers[0].name = '新帳本'; }
+  const acctOf = id => db.accounts.find(a => a.id === id);
+  const debt = a => a && (a.account_type === 'receivable' || a.account_type === 'payable');
+  const views = {
+    account_balances: () => db.accounts.map(a => {
+      let b = 0;
+      for (const t of db.transactions) {
+        if (t.account_id === a.id) b += (t.kind === 'expense' || t.kind === 'transfer') ? -t.amount : +t.amount;
+        if (t.kind === 'transfer' && t.to_account_id === a.id) b += +(t.to_amount ?? t.amount);
+      }
+      return { ...a, balance: Math.round(b * 100) / 100 };
+    }),
+    investment_positions: () => views.account_balances().filter(a => ['stock', 'fund', 'investment'].includes(a.account_type)).map(a => {
+      let shares = null, realized = 0, trades = 0, last = null;
+      for (const t of db.transactions.filter(t => t.trade_side)) {
+        const acc = t.trade_side === 'buy' && t.kind === 'transfer' ? t.to_account_id : t.account_id;
+        if (acc !== a.id) continue;
+        shares = (shares || 0) + (t.trade_side === 'buy' ? +t.quantity : -t.quantity); trades++;
+        if (t.trade_side === 'sell') realized += (t.to_amount ?? t.amount) - t.amount;
+        if (!last || t.occurred_at > last) last = t.occurred_at;
+      }
+      return { ledger_id: a.ledger_id, id: a.id, name: a.name, account_type: a.account_type, currency: a.currency, hidden: a.hidden, cost: a.balance, shares, realized, trades, last_trade: last };
+    }),
+    counterparty_balances: () => db.counterparties.flatMap(c => {
+      const m = new Map();
+      for (const t of db.transactions.filter(t => t.counterparty_id === c.id)) {
+        const A = acctOf(t.account_id), B = acctOf(t.to_account_id), add = (cur, v) => { const e = m.get(cur) || { b: 0, n: 0, last: null }; e.b += v; e.n++; e.last = t.occurred_at > (e.last || '') ? t.occurred_at : e.last; m.set(cur, e); };
+        if (debt(A)) add(A.currency, (t.kind === 'expense' || t.kind === 'transfer') ? -t.amount : +t.amount);
+        if (t.kind === 'transfer' && debt(B)) add(B.currency, +(t.to_amount ?? t.amount));
+      }
+      if (!m.size) return [{ ...c, currency: null, balance: 0, tx_count: 0, last_at: null }];
+      return [...m].map(([cur, e]) => ({ ...c, currency: cur, balance: e.b, tx_count: e.n, last_at: e.last }));
+    }),
+  };
+  const splitTop = s => { const out = []; let depth = 0, cur = ''; for (const ch of s) { if (ch === '(') depth++; if (ch === ')') depth--; if (ch === ',' && !depth) { out.push(cur); cur = ''; } else cur += ch; } out.push(cur); return out; };
+  class Q {
+    constructor(t) { this.t = t; this.f = []; this.op = 'select'; this.ord = []; this.lim = null; this.rng = null; this.cnt = false; this.one = false; this.ret = false; }
+    select(_c, o) { if (this.op === 'select') this.cnt = o?.count === 'exact'; else this.ret = true; return this; }
+    insert(r) { this.op = 'insert'; this.payload = r; return this; }
+    update(r) { this.op = 'update'; this.payload = r; return this; }
+    delete() { this.op = 'delete'; return this; }
+    eq(k, v) { this.f.push(r => String(r[k]) === String(v)); return this; }
+    is(k) { this.f.push(r => r[k] == null); return this; }
+    in(k, arr) { const s = arr.map(String); this.f.push(r => s.includes(String(r[k]))); return this; }
+    ilike(k, p) { const s = p.replace(/%/g, '').toLowerCase(); this.f.push(r => (r[k] || '').toLowerCase().includes(s)); return this; }
+    gte(k, v) { this.f.push(r => r[k] >= v); return this; }
+    lt(k, v) { this.f.push(r => r[k] < v); return this; }
+    or(expr) {
+      const parts = splitTop(expr).map(p => { const [col, op, ...rest] = p.split('.'); const val = rest.join('.');
+        return op === 'in' ? (r => val.replace(/[()]/g, '').split(',').includes(String(r[col]))) : (r => String(r[col]) === val); });
+      this.f.push(r => parts.some(fn => fn(r))); return this;
+    }
+    order(k, o = {}) { this.ord.push([k, o.ascending !== false]); return this; }
+    limit(n) { this.lim = n; return this; }
+    range(a, b) { this.rng = [a, b]; return this; }
+    single() { this.one = true; return this; }
+    then(res, rej) { return new Promise(r => setTimeout(r, 60)).then(() => this.exec()).then(res, rej); }
+    exec() {
+      const table = db[this.t], match = r => this.f.every(fn => fn(r));
+      if (this.op === 'insert') {
+        const rows = (Array.isArray(this.payload) ? this.payload : [this.payload]).map(p => ({ ...p }));
+        for (const r of rows) {
+          if (this.t === 'counterparties' && table.some(c => c.name === r.name)) return { data: null, error: { code: '23505', message: '已經有同名的對象' } };
+          r.id = Math.max(0, ...table.map(x => x.id)) + 1;
+          if (this.t === 'counterparties') Object.assign(r, { hidden: false, memo: r.memo ?? null, sort_order: null });
+          if (this.t === 'transactions') for (const k of ['counterparty_id', 'to_account_id', 'to_amount', 'category_id', 'quantity', 'unit_price', 'fee', 'trade_side', 'memo']) r[k] ??= null;
+          if (this.t === 'accounts') Object.assign(r, { hidden: false, memo: r.memo ?? null, sort_order: r.sort_order ?? null });
+          if (this.t === 'categories') Object.assign(r, { hidden: false, parent_id: r.parent_id ?? null });
+          table.push(r);
+        }
+        return { data: this.ret ? (this.one ? rows[0] : rows) : null, error: null };
+      }
+      if (this.op === 'update') { const rows = table.filter(match); rows.forEach(r => Object.assign(r, this.payload)); return { data: null, error: null }; }
+      if (this.op === 'delete') {
+        const gone = table.filter(match), fk = { data: null, error: { code: '23503', message: 'still referenced' } };
+        if (this.t === 'accounts' && gone.some(a => db.transactions.some(t => t.account_id === a.id || t.to_account_id === a.id))) return fk;
+        if (this.t === 'categories' && gone.some(c => db.transactions.some(t => t.category_id === c.id) || db.categories.some(k => k.parent_id === c.id))) return fk;
+        db[this.t] = table.filter(r => !match(r)); return { data: null, error: null };
+      }
+      let rows = (views[this.t] ? views[this.t]() : table).filter(match).map(r => ({ ...r }));
+      for (const [k, asc] of [...this.ord].reverse()) rows.sort((a, b) => { const x = a[k], y = b[k]; if (x == null && y == null) return 0; if (x == null) return 1; if (y == null) return -1; return (x < y ? -1 : x > y ? 1 : 0) * (asc ? 1 : -1); });
+      const count = rows.length;
+      if (this.rng) rows = rows.slice(this.rng[0], this.rng[1] + 1);
+      if (this.lim != null) rows = rows.slice(0, this.lim);
+      return { data: this.one ? rows[0] ?? null : rows, error: null, count: this.cnt ? count : null };
+    }
+  }
+  const session = { user: { id: 'demo', email: '預覽模式（範例資料）' } };
+  return {
+    demo: true, session,
+    from: t => new Q(t),
+    rpc: async () => ({ data: 0, error: null }),
+    auth: { signOut: async () => exitDemo(), getSession: async () => ({ data: { session } }) },
+  };
+}
+/*DEMO-END*/
 
 /* ---------- helpers ---------- */
 const $ = (s, r = document) => r.querySelector(s);
@@ -179,7 +360,10 @@ async function fetchAll(build) { // 分頁取回超過 1000 筆
 const S = { user: null, ledger: null, accts: [], acctMap: new Map(), bal: new Map(), cats: [], catMap: new Map(),
             cps: [], cpMap: new Map(), cpBal: [], month: som(new Date()), view: LS.get('view', 'flow'), q: '',
             showZero: LS.get('showZero', false), sel: new Set() };
-const TX_COLS = 'id,kind,occurred_at,account_id,to_account_id,amount,to_amount,category_id,memo,counterparty_id';
+const TX_COLS = 'id,kind,occurred_at,account_id,to_account_id,amount,to_amount,category_id,memo,counterparty_id,quantity,unit_price,fee,trade_side';
+const INV_TYPES = ['stock', 'fund', 'investment'];
+const isInv = a => a && INV_TYPES.includes(a.account_type);
+const qf = new Intl.NumberFormat('zh-TW', { maximumFractionDigits: 4 });
 const acct = id => S.acctMap.get(id);
 const isRec = a => a && a.account_type === 'receivable';
 const isPay = a => a && a.account_type === 'payable';
@@ -214,10 +398,12 @@ function personDelta(t) {
 }
 
 /* ---------- auth ---------- */
+let OFFLINE = false;
 function renderLogin(mode = 'in', msg = '') {
   $('#app').innerHTML = `
   <div class="login">
     <div><h1>我的記帳本</h1><p>登入後，手機和電腦看到的是同一本帳。</p></div>
+    ${OFFLINE ? `<div class="card" style="box-shadow:none;border:1px solid var(--line)"><p style="color:var(--ink)">目前連不到資料庫，可能是在預覽視窗裡開啟。</p><p class="hint" style="margin-top:6px">可以先用範例資料試用所有功能，資料都是假的，不會存到你的帳本。</p><button class="btn" id="demo2" style="margin-top:12px;width:100%">用範例資料預覽</button><button class="btn ghost" id="demo3" style="margin-top:8px;width:100%">預覽新使用者的空白帳本</button></div>` : ''}
     <div class="seg" role="group">
       <button type="button" data-m="in" aria-pressed="${mode === 'in'}">登入</button>
       <button type="button" data-m="up" aria-pressed="${mode === 'up'}">註冊</button>
@@ -229,10 +415,14 @@ function renderLogin(mode = 'in', msg = '') {
       ${mode === 'in' ? '<button class="linkbtn" type="button" id="forgot">忘記密碼？</button>' : '<p class="hint">註冊後若收到確認信，請先點信中的連結再回來登入。</p>'}
       <p class="hint" id="authMsg">${esc(msg)}</p>
     </form>
+    ${OFFLINE ? '' : '<button class="linkbtn" id="demo1" type="button" style="align-self:center">先用範例資料看看</button>'}
   </div>`;
   $$('.seg button').forEach(b => b.onclick = () => renderLogin(b.dataset.m));
+  ['demo1', 'demo2'].forEach(id => { const b = $('#' + id); if (b) b.onclick = () => startDemo(false); });
+  const d3 = $('#demo3'); if (d3) d3.onclick = () => startDemo(true);
   $('#authForm').onsubmit = async e => {
     e.preventDefault();
+    if (!real || OFFLINE) { $('#authMsg').textContent = '連不到資料庫，現在無法登入。請改用範例資料預覽，或把網頁放到 GitHub Pages 後再登入。'; return; }
     const email = $('#em').value.trim(), password = $('#pw').value;
     $('#authMsg').textContent = '處理中…';
     const r = mode === 'in'
@@ -273,9 +463,11 @@ async function loadRef() {
     sb.from('categories').select('*').eq('ledger_id', L).order('sort_order', { nullsFirst: false }).order('id'),
     sb.from('counterparties').select('*').eq('ledger_id', L).order('sort_order', { nullsFirst: false }).order('name'),
     sb.from('counterparty_balances').select('id,currency,balance,tx_count,last_at').eq('ledger_id', L),
+    sb.from('investment_positions').select('id,cost,shares,realized,trades,last_trade').eq('ledger_id', L),
   ]);
   for (const r of rs) if (r.error) throw r.error;
-  const [a, b, c, p, pb] = rs.map(r => r.data);
+  const [a, b, c, p, pb, ip] = rs.map(r => r.data);
+  S.pos = new Map(ip.map(x => [x.id, { cost: Number(x.cost) || 0, shares: x.shares == null ? null : Number(x.shares), realized: Number(x.realized) || 0, trades: x.trades, last: x.last_trade }]));
   S.accts = a; S.acctMap = new Map(a.map(x => [x.id, x]));
   S.bal = new Map(b.map(x => [x.id, Number(x.balance)]));
   S.cats = c; S.catMap = new Map(c.map(x => [x.id, x]));
@@ -289,20 +481,22 @@ const ICONS = {
   accts: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10h18M16 15h2"/></svg>',
   loans: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="8" r="3"/><circle cx="16" cy="16" r="3"/><path d="M13 6h5v5M11 18H6v-5"/></svg>',
   report: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 20V11M12 20V5M19 20v-7"/></svg>',
+  invest: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 18l5-6 4 3 7-9"/><path d="M15 6h5v5"/></svg>',
 };
-const TITLES = { flow: '流水', accts: '帳戶', loans: '借貸', report: '報表' };
+const TITLES = { flow: '流水', accts: '帳戶', loans: '借貸對象', invest: '投資', report: '損益表' };
 function renderShell() {
   $('#app').innerHTML = `
-    <header class="top"><h1 id="title"></h1><button class="iconbtn" id="me" aria-label="帳號">${esc((S.user.email || '?')[0].toUpperCase())}</button></header>
+    <header class="top"><button class="iconbtn" id="back" aria-label="返回帳戶" hidden>‹</button><h1 id="title"></h1>${DEMO ? '<span class="chip loan">預覽・範例資料</span>' : ''}<button class="iconbtn" id="me" aria-label="帳號">${esc((S.user.email || '?')[0].toUpperCase())}</button></header>
     <main id="view"></main>
     <div class="selbar" id="selbar" hidden><div><span id="selcount"></span><button class="btn small" id="selassign">指定對象</button><button class="linkbtn" id="selclear" style="color:inherit">取消</button></div></div>
     <nav class="tabs">
       ${['flow', 'accts'].map(v => `<button data-v="${v}">${ICONS[v]}${TITLES[v]}</button>`).join('')}
       <button class="fab" id="fab" aria-label="記一筆"><span>＋</span>記一筆</button>
-      ${['loans', 'report'].map(v => `<button data-v="${v}">${ICONS[v]}${TITLES[v]}</button>`).join('')}
+      ${['invest', 'report'].map(v => `<button data-v="${v}">${ICONS[v]}${v === 'report' ? '報表' : TITLES[v]}</button>`).join('')}
     </nav>`;
   $$('nav.tabs [data-v]').forEach(b => b.onclick = () => go(b.dataset.v));
-  $('#fab').onclick = () => openForm({ mode: S.view === 'loans' ? 'loan' : 'expense' });
+  $('#back').onclick = () => go('accts');
+  $('#fab').onclick = () => openForm({ mode: S.view === 'loans' ? 'loan' : S.view === 'invest' ? 'invest' : 'expense' });
   $('#me').onclick = openMe;
   $('#selclear').onclick = () => { S.sel.clear(); $$('#view input[data-sel]').forEach(c => c.checked = false); updateSelbar(); };
   $('#selassign').onclick = () => pickPerson([...S.sel]);
@@ -310,25 +504,30 @@ function renderShell() {
 }
 function go(v) {
   S.view = v; LS.set('view', v); S.sel.clear(); updateSelbar();
-  $$('nav.tabs [data-v]').forEach(b => b.setAttribute('aria-current', b.dataset.v === v ? 'page' : 'false'));
+  $$('nav.tabs [data-v]').forEach(b => b.setAttribute('aria-current', (b.dataset.v === v || (v === 'loans' && b.dataset.v === 'accts')) ? 'page' : 'false'));
   $('#title').textContent = TITLES[v];
+  $('#back').hidden = v !== 'loans';
   window.scrollTo(0, 0);
   return refresh();
 }
 async function refresh() {
-  try { await ({ flow: viewFlow, accts: viewAccts, loans: viewLoans, report: viewReport }[S.view])(); }
+  if (!TITLES[S.view]) S.view = 'flow';
+  try { await ({ flow: viewFlow, accts: viewAccts, loans: viewLoans, invest: viewInvest, report: viewReport }[S.view])(); }
   catch (e) { fail(e); }
 }
 async function reloadAll() { await loadRef(); await refresh(); }
 
 function openMe() {
   openSheet(`
-    <div class="sheethead"><h2>帳號</h2><button class="iconbtn" data-close aria-label="關閉">✕</button></div>
+    <div class="sheethead"><h2>設定</h2><button class="iconbtn" data-close aria-label="關閉">✕</button></div>
     <div class="form">
       <p class="hint">登入身分：${esc(S.user.email)}<br>帳本：${esc(S.ledger.name)}</p>
+      <div class="two"><button class="btn ghost" id="mAccts">管理帳戶</button><button class="btn ghost" id="mCats">管理分類</button></div>
       <button class="btn ghost" id="reload">重新整理資料</button>
-      <button class="btn danger" id="logout">登出</button>
+      <button class="btn danger" id="logout">${DEMO ? '離開預覽' : '登出'}</button>
     </div>`, root => {
+    $('#mAccts', root).onclick = () => manageAccounts();
+    $('#mCats', root).onclick = () => manageCats();
     $('#reload', root).onclick = async () => { closeSheet(); await reloadAll(); toast('已更新'); };
     $('#logout', root).onclick = async () => { closeSheet(); await sb.auth.signOut(); };
   });
@@ -347,28 +546,55 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#sheet
 
 /* ---------- transaction row ---------- */
 function catLabel(id) { const c = S.catMap.get(id); return c ? c.name : ''; }
+// 把一筆交易翻成會計分錄：借方、貸方、金額
+function journal(t) {
+  const A = acct(t.account_id), B = acct(t.to_account_id);
+  const an = A?.name || '?', bn = B?.name || '?', cn = catLabel(t.category_id) || (t.kind === 'expense' ? '未分類支出' : '未分類收入');
+  const amt = +t.amount, neg = amt < 0, abs = Math.abs(amt), cur = A?.currency;
+  switch (t.kind) {
+    case 'expense': return neg ? { dr: an, cr: cn, amount: abs, cur, sign: '+' } : { dr: cn, cr: an, amount: abs, cur, sign: '−' };
+    case 'income': return neg ? { dr: cn, cr: an, amount: abs, cur, sign: '−' } : { dr: an, cr: cn, amount: abs, cur, sign: '+' };
+    case 'transfer': return { dr: bn, cr: an, amount: abs, cur, sign: '' };
+    case 'opening_balance': return neg ? { dr: '期初權益', cr: an, amount: abs, cur, sign: '−' } : { dr: an, cr: '期初權益', amount: abs, cur, sign: '+' };
+    default: return neg ? { dr: '餘額調整', cr: an, amount: abs, cur, sign: '−' } : { dr: an, cr: '餘額調整', amount: abs, cur, sign: abs ? '+' : '' };
+  }
+}
 function txRow(t, { showDate = false, selectable = false, accountId = null, person = false } = {}) {
   const A = acct(t.account_id), B = acct(t.to_account_id), lt = loanType(t);
   const cp = t.counterparty_id ? S.cpMap.get(t.counterparty_id) : null;
-  let title, sub, cls, dot, amtHtml;
+  let title, cls, dot, amtHtml;
   const d = new Date(t.occurred_at);
   const when = showDate ? `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())}` : `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  let amount, cur, sign = '';
-  if (lt) {
+  const J = journal(t);
+  let amount = J.amount, cur = J.cur, sign = J.sign;
+  if (t.trade_side) {
+    const inv = t.trade_side === 'buy' ? (t.kind === 'transfer' ? B : A) : A;
+    const q = t.quantity != null ? ` ${qf.format(t.quantity)} 股` : '';
+    if (t.kind !== 'transfer') { title = `補登股數 · ${inv?.name || ''}${q}`; dot = '補'; cls = 'tr'; }
+    else if (t.trade_side === 'buy') { title = `買進 · ${inv?.name || ''}${q}${t.unit_price != null ? ' @' + qf.format(t.unit_price) : ''}`; dot = '買'; cls = 'tr'; }
+    else {
+      const pl = (t.to_amount ?? t.amount) - t.amount;
+      title = `賣出 · ${inv?.name || ''}${q}${t.unit_price != null ? ' @' + qf.format(t.unit_price) : ''}`; dot = '賣'; cls = pl >= 0 ? 'inc' : 'exp';
+      amount = Math.abs(pl); sign = pl > 0 ? '+' : pl < 0 ? '−' : ''; cur = A?.currency;
+      title += '　損益';
+    }
+  } else if (lt) {
     const L = LOAN[lt], mine = L.dir === 'out' ? A : B;
-    title = L.label + ' · ' + (cp ? cp.name : '未指定對象'); sub = mine?.name || ''; cls = 'loan'; dot = L.label[0];
+    title = L.label + ' · ' + (cp ? cp.name : '未指定對象'); cls = 'loan'; dot = L.label[0];
     amount = L.dir === 'out' ? t.amount : (t.to_amount ?? t.amount); cur = mine?.currency; sign = L.dir === 'out' ? '−' : '+';
   } else if (t.kind === 'expense') {
-    title = catLabel(t.category_id) || '支出'; cls = isPay(A) ? 'loan' : 'exp'; dot = (title[0] || '支');
+    title = catLabel(t.category_id) || '支出'; cls = isPay(A) ? 'loan' : (t.amount < 0 ? 'inc' : 'exp'); dot = (title[0] || '支');
+    if (t.amount < 0) title += ' · 退款沖銷';
     if (isPay(A)) title += ' · ' + (cp ? cp.name + '代付' : '他人代付');
-    sub = A?.name || ''; amount = t.amount; cur = A?.currency; sign = '−';
   } else if (t.kind === 'income') {
-    title = catLabel(t.category_id) || '收入'; cls = 'inc'; dot = (title[0] || '收'); sub = A?.name || ''; amount = t.amount; cur = A?.currency; sign = '+';
+    title = catLabel(t.category_id) || '收入'; cls = t.amount < 0 ? 'exp' : 'inc'; dot = (title[0] || '收');
+    if (t.amount < 0) title += ' · 沖回';
   } else if (t.kind === 'transfer') {
-    title = '轉帳'; cls = 'tr'; dot = '轉'; sub = `${A?.name || '?'} → ${B?.name || '?'}`; amount = t.amount; cur = A?.currency;
+    title = isInv(B) ? '轉入投資' : isInv(A) ? '投資轉出' : '轉帳'; cls = 'tr'; dot = '轉';
   } else {
-    title = t.kind === 'opening_balance' ? '期初餘額' : '餘額調整'; cls = 'tr'; dot = '初'; sub = A?.name || ''; amount = t.amount; cur = A?.currency;
+    title = t.kind === 'opening_balance' ? '期初餘額' : '餘額調整'; cls = 'tr'; dot = t.kind === 'opening_balance' ? '初' : '調';
   }
+  const sub = `借 ${J.dr}　貸 ${J.cr}`;
   if (accountId != null) { const dl = deltaFor(t, accountId); amount = Math.abs(dl); cur = acct(accountId)?.currency; sign = dl < 0 ? '−' : dl > 0 ? '+' : ''; }
   if (person) { const pd = personDelta(t)[0]; if (pd) { amount = Math.abs(pd[1]); cur = pd[0]; sign = pd[1] > 0 ? '+' : '−'; } }
   const amtCls = cls === 'tr' ? '' : cls;
@@ -394,11 +620,15 @@ function updateSelbar() { const b = $('#selbar'); if (!b) return; b.hidden = !S.
 async function viewFlow() {
   const v = $('#view'), L = S.ledger.id, m = S.month;
   const label = `${m.getFullYear()} 年 ${m.getMonth() + 1} 月`;
+  const fresh = S.accts.every(a => Math.abs(S.bal.get(a.id) || 0) < 0.005);
   v.innerHTML = `
+    ${fresh ? `<div class="card"><strong>第一次使用？</strong><p class="hint" style="margin:4px 0 12px">先把每個帳戶現在有多少錢、信用卡欠多少填進來，之後的餘額和淨資產才會準。沒有的帳戶可以先新增。</p>
+      <div class="two"><button class="btn" id="startRec">盤點帳戶餘額</button><button class="btn ghost" id="startAdd">＋ 新增帳戶</button></div></div>` : ''}
     <div class="search"><input id="q" type="search" placeholder="搜尋備註（全部時間）" value="${esc(S.q)}" aria-label="搜尋備註"></div>
     ${S.q ? '' : `<div class="card"><div class="monthbar"><button id="prev" aria-label="上個月">‹</button><strong>${label}</strong><button id="next" aria-label="下個月">›</button></div>
       <div class="summary" id="sum"><div><small>支出</small><span class="num exp">…</span></div><div><small>收入</small><span class="num inc">…</span></div><div><small>結餘</small><span class="num">…</span></div></div><div class="extra" id="sumx"></div></div>`}
     <div id="days"><div class="spinner">載入中…</div></div>`;
+  if (fresh) { $('#startRec').onclick = () => reconcile(); $('#startAdd').onclick = () => editAccount(null); }
   const q = $('#q'); let timer;
   q.oninput = () => { clearTimeout(timer); timer = setTimeout(() => { S.q = q.value.trim(); viewFlow().then(() => { const n = $('#q'); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }); }, 400); };
   if (!S.q) { $('#prev').onclick = () => { S.month = addMonths(S.month, -1); viewFlow(); }; $('#next').onclick = () => { S.month = addMonths(S.month, 1); viewFlow(); }; }
@@ -435,17 +665,84 @@ async function viewFlow() {
 
 /* ---------- 帳戶 ---------- */
 const GROUPS = [
-  ['現金與錢包', ['cash', 'e_wallet', 'stored_value']], ['銀行', ['bank']], ['信用卡', ['credit_card']],
+  ['現金', ['cash']], ['電子錢包與儲值', ['e_wallet', 'stored_value']], ['銀行', ['bank']], ['信用卡', ['credit_card']],
   ['投資', ['stock', 'fund', 'investment']], ['債權與債務', ['receivable', 'payable']],
 ];
+const TYPE_LABEL = { cash: '現金', e_wallet: '電子錢包', stored_value: '儲值卡', bank: '銀行', credit_card: '信用卡', stock: '股票', fund: '基金',
+                     investment: '其他投資', receivable: '應收款項', payable: '應付款項' };
+const CURRENCIES = ['TWD', 'USD', 'JPY', 'EUR', 'CNY', 'HKD', 'AUD', 'GBP', 'SGD', 'KRW', 'THB', 'VND'];
+const natureOf = t => (t === 'credit_card' || t === 'payable') ? 'liability' : t === 'receivable' ? 'receivable' : 'asset';
+const isLiabType = t => natureOf(t) === 'liability';
+// 盤點：填每個帳戶的實際餘額，差額記成期初餘額（帳戶還沒有金額時）或餘額調整
+function reconcile() {
+  const rows = allGroups().map(([name, types]) => {
+    const list = groupAccts(types, a => !a.hidden); if (!list.length) return '';
+    const liab = types.some(isLiabType), inv = types.some(t => INV_TYPES.includes(t));
+    return `<div class="sectionhead"><h2>${name}${liab ? '（填欠款）' : inv ? '（填成本）' : ''}</h2></div><div class="list">${list.map(a => {
+      const b = S.bal.get(a.id) || 0, shown = isLiabType(a.account_type) ? -b : b;
+      return `<label class="row recrow" for="rc${a.id}"><span class="main"><span class="t">${esc(a.name)}</span><span class="s">目前 ${money(shown, a.currency)}</span></span>
+        <input id="rc${a.id}" data-rc="${a.id}" class="num" inputmode="decimal" placeholder="${nf.format(shown)}" aria-label="${esc(a.name)} 實際金額"></label>`; }).join('')}</div>`;
+  }).join('');
+  openSheet(`<div class="sheethead"><h2>盤點餘額</h2><button class="iconbtn" data-close aria-label="關閉">✕</button></div>
+    <form class="form" id="rf">
+      <p class="hint" style="margin:0">只要填和目前不一樣的帳戶，空白的不會變動。信用卡和應付款項填「欠多少」。系統會把差額記成一筆調整；帳戶原本是 0 的，會記成期初餘額。</p>
+      <div class="field"><label for="rcd">盤點日期</label><input id="rcd" type="date" value="${toLocalInput(new Date()).slice(0, 10)}"></div>
+      ${rows}
+      <div class="card" style="box-shadow:none;background:var(--bg);padding:12px" id="rsum">尚未填寫任何帳戶。</div>
+      <p class="hint" id="rerr" style="color:var(--inc)"></p>
+      <button class="btn" type="submit">儲存盤點</button>
+    </form>`, root => {
+    const collect = () => {
+      const out = [];
+      for (const inp of $$('[data-rc]', root)) {
+        const raw = inp.value.replace(/,/g, '').trim(); if (raw === '') continue;
+        const n = parseFloat(raw); if (!isFinite(n)) return { err: `「${acct(+inp.dataset.rc).name}」的金額格式不對。` };
+        const a = acct(+inp.dataset.rc), cur = S.bal.get(a.id) || 0, target = isLiabType(a.account_type) ? -n : n, diff = Math.round((target - cur) * 100) / 100;
+        if (Math.abs(diff) >= 0.005) out.push({ a, cur, diff });
+      }
+      return { out };
+    };
+    const upd = () => {
+      const { out, err } = collect(); const box = $('#rsum', root);
+      if (err) { box.textContent = err; return; }
+      box.innerHTML = out.length ? `會記錄 ${out.length} 筆：` + out.map(x => `<div style="display:flex;justify-content:space-between;gap:8px"><span>${esc(x.a.name)}${Math.abs(x.cur) < 0.005 ? '（期初）' : ''}</span><span class="num">${money(x.diff, x.a.currency, true)}</span></div>`).join('') : '尚未填寫任何帳戶，或填的金額和目前一樣。';
+    };
+    $$('[data-rc]', root).forEach(i => i.oninput = upd);
+    $('#rf', root).onsubmit = async e => {
+      e.preventDefault();
+      const { out, err } = collect(); if (err) return $('#rerr', root).textContent = err;
+      if (!out.length) return $('#rerr', root).textContent = '沒有需要調整的帳戶。';
+      const d = new Date($('#rcd', root).value + 'T00:00'); if (isNaN(d)) return $('#rerr', root).textContent = '日期格式不對。';
+      const rows = out.map(x => ({ ledger_id: S.ledger.id, account_id: x.a.id, amount: x.diff, occurred_at: d.toISOString(),
+        kind: Math.abs(x.cur) < 0.005 ? 'opening_balance' : 'balance_adjustment', memo: Math.abs(x.cur) < 0.005 ? '期初餘額' : '盤點調整' }));
+      const { error } = await sb.from('transactions').insert(rows);
+      if (error) return $('#rerr', root).textContent = error.message;
+      closeSheet(); toast(`已盤點 ${rows.length} 個帳戶`); await reloadAll();
+    };
+  });
+}
+const bySort = (a, b) => ((a.sort_order ?? 1e9) - (b.sort_order ?? 1e9)) || (a.id - b.id);
+const otherTypes = () => { const known = new Set(GROUPS.flatMap(g => g[1])); return [...new Set(S.accts.map(a => a.account_type).filter(t => !known.has(t)))]; };
+const allGroups = () => [...GROUPS, ['其他', otherTypes()]];
+const groupTypes = t => (allGroups().find(g => g[1].includes(t)) || [null, [t]])[1];
+const groupAccts = (types, filter = () => true) => S.accts.filter(a => types.includes(a.account_type) && filter(a)).sort(bySort);
+const nextSort = list => Math.max(0, ...list.map(x => x.sort_order || 0)) + 1;
+// 上移／下移：交換後把同組重新編號 1..n，只更新有變動的列
+async function reorder(table, siblings, id, dir) {
+  const list = siblings.slice(), i = list.findIndex(x => x.id === id), j = i + dir;
+  if (i < 0 || j < 0 || j >= list.length) return;
+  [list[i], list[j]] = [list[j], list[i]];
+  const ups = list.map((x, k) => [x, k + 1]).filter(([x, n]) => x.sort_order !== n);
+  const rs = await Promise.all(ups.map(([x, n]) => sb.from(table).update({ sort_order: n }).eq('id', x.id)));
+  const bad = rs.find(r => r.error); if (bad) throw bad.error;
+  await loadRef();
+}
 async function viewAccts() {
   const v = $('#view');
   const net = {};
   for (const a of S.accts) { if (a.hidden) continue; const b = S.bal.get(a.id) || 0; net[a.currency] = (net[a.currency] || 0) + b; }
-  const known = new Set(GROUPS.flatMap(g => g[1]));
-  const groups = [...GROUPS, ['其他', S.accts.map(a => a.account_type).filter(t => !known.has(t))]];
-  const html = groups.map(([name, types]) => {
-    const list = S.accts.filter(a => types.includes(a.account_type) && !a.hidden && (S.showZero || Math.abs(S.bal.get(a.id) || 0) >= 0.005));
+  const html = allGroups().map(([name, types]) => {
+    const list = groupAccts(types, a => !a.hidden && (S.showZero || Math.abs(S.bal.get(a.id) || 0) >= 0.005));
     if (!list.length) return '';
     const sub = {}; list.forEach(a => sub[a.currency] = (sub[a.currency] || 0) + (S.bal.get(a.id) || 0));
     return `<div class="sectionhead"><h2>${name}</h2><span class="num muted">${Object.entries(sub).map(([c, x]) => money(x, c)).join(' · ')}</span></div>
@@ -455,16 +752,119 @@ async function viewAccts() {
   v.innerHTML = `
     <div class="card"><small class="muted">淨資產（台幣）</small><div class="num bigtotal">${money(net.TWD || 0)}</div>
       ${Object.entries(net).filter(([c]) => c !== 'TWD').length ? `<div class="extra">外幣：${Object.entries(net).filter(([c]) => c !== 'TWD').map(([c, x]) => money(x, c)).join('，')}</div>` : ''}</div>
-    <label class="toggle"><input type="checkbox" id="zero" ${S.showZero ? 'checked' : ''}> 顯示餘額為 0 的帳戶</label>
-    ${html}`;
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <label class="toggle" style="flex:1"><input type="checkbox" id="zero" ${S.showZero ? 'checked' : ''}> 顯示餘額為 0 的帳戶</label>
+      <button class="btn small ghost" id="addAcct">＋ 新增帳戶</button><button class="btn small ghost" id="recAcct">盤點</button><button class="btn small ghost" id="mgAcct">排序與隱藏</button></div>
+    ${html}
+    <div class="list"><button class="row" id="toLoans"><span class="dot loan">人</span><span class="main"><span class="t">借貸對象</span><span class="s">按人查看應收、應付款項</span></span><span class="amt muted">›</span></button></div>`;
   $('#zero').onchange = e => { S.showZero = e.target.checked; LS.set('showZero', S.showZero); viewAccts(); };
+  $('#toLoans').onclick = () => go('loans');
+  $('#addAcct').onclick = () => editAccount(null);
+  $('#recAcct').onclick = () => reconcile();
+  $('#mgAcct').onclick = () => manageAccounts();
   $$('[data-acct]', v).forEach(b => b.onclick = () => openAccount(+b.dataset.acct));
+}
+function manageAccounts() {
+  const rows = allGroups().map(([name, types]) => {
+    const list = groupAccts(types); if (!list.length) return '';
+    return `<div class="sectionhead"><h2>${name}</h2></div><div class="list">${list.map((a, i) => `<div class="row mrow${a.hidden ? ' ishidden' : ''}">
+      <button type="button" class="mmain" data-edit="${a.id}"><span class="t">${esc(a.name)}</span><span class="s">${TYPE_LABEL[a.account_type] || a.account_type}${a.currency !== 'TWD' ? '・' + a.currency : ''}${a.hidden ? '・已隱藏' : ''}</span></button>
+      <button type="button" class="mv" data-mv="${a.id}" data-d="-1" ${i ? '' : 'disabled'} aria-label="上移">↑</button><button type="button" class="mv" data-mv="${a.id}" data-d="1" ${i < list.length - 1 ? '' : 'disabled'} aria-label="下移">↓</button></div>`).join('')}</div>`;
+  }).join('');
+  openSheet(`<div class="sheethead"><h2>帳戶排序與隱藏</h2><button class="iconbtn" data-close aria-label="關閉">✕</button></div>
+    <div class="form"><p class="hint" style="margin:0">用箭頭調整同一組裡的順序；點帳戶名稱可以改名、改類型或隱藏。</p><button class="btn" id="mAdd">＋ 新增帳戶</button>${rows}</div>`, root => {
+    $('#mAdd', root).onclick = () => editAccount(null, true);
+    $$('[data-edit]', root).forEach(b => b.onclick = () => editAccount(+b.dataset.edit, true));
+    $$('[data-mv]', root).forEach(b => b.onclick = async () => {
+      const a = acct(+b.dataset.mv);
+      try { await reorder('accounts', groupAccts(groupTypes(a.account_type)), a.id, +b.dataset.d); manageAccounts(); refresh(); } catch (e) { fail(e); }
+    });
+  });
+}
+function editAccount(id, fromManager = false) {
+  const a = id ? acct(id) : null;
+  const typeOpts = allGroups().filter(g => g[1].length).map(([name, types]) => `<optgroup label="${name}">${types.map(t => `<option value="${t}" ${(a?.account_type || 'bank') === t ? 'selected' : ''}>${TYPE_LABEL[t] || t}</option>`).join('')}</optgroup>`).join('');
+  const curs = CURRENCIES.includes(a?.currency || 'TWD') ? CURRENCIES : [a.currency, ...CURRENCIES];
+  openSheet(`<div class="sheethead"><h2>${a ? '編輯帳戶' : '新增帳戶'}</h2><button class="iconbtn" data-close aria-label="關閉">✕</button></div>
+    <form class="form" id="af">
+      <div class="field"><label for="an">名稱</label><input id="an" required value="${esc(a?.name || '')}" placeholder="例如：國泰世華"></div>
+      <div class="two"><div class="field"><label for="at">類型</label><select id="at">${typeOpts}</select></div>
+        <div class="field"><label for="ac">幣別</label><select id="ac">${curs.map(c => `<option ${c === (a?.currency || 'TWD') ? 'selected' : ''}>${c}</option>`).join('')}</select></div></div>
+      <div class="field"><label for="am">備註</label><input id="am" value="${esc(a?.memo || '')}"></div>
+      <div id="obox">${a ? '<p class="hint">讀取期初餘額…</p>' : ''}</div>
+      ${a ? `<label class="toggle"><input type="checkbox" id="ah" ${a.hidden ? 'checked' : ''}> 隱藏這個帳戶（不出現在帳戶頁和選單，紀錄保留）</label>
+        <p class="hint" style="margin:0">已有紀錄的帳戶改幣別時，金額不會換算。</p>` : ''}
+      <p class="hint" id="aerr" style="color:var(--inc)"></p>
+      <div class="formbtns">${a ? '<button type="button" class="btn danger" id="adel">刪除</button>' : ''}<button class="btn" type="submit">儲存</button></div>
+    </form>`, async root => {
+    const err = m => $('#aerr', root).textContent = m;
+    const after = async () => { await reloadAll(); if (fromManager) manageAccounts(); else closeSheet(); };
+    // 期初餘額：新帳戶直接填；既有帳戶只有 0～1 筆期初紀錄時可在這裡改
+    let ob = null, obEditable = true;
+    const obLabel = () => isLiabType($('#at', root).value) ? '期初欠款' : isInv({ account_type: $('#at', root).value }) ? '期初成本' : '期初餘額';
+    const drawOb = () => {
+      const box = $('#obox', root); if (!obEditable) return;
+      const sign = isLiabType($('#at', root).value) ? -1 : 1;
+      const val = $('#ob', root)?.value ?? (ob ? String(+ob.amount * sign) : '');
+      const when = $('#obd', root)?.value ?? (ob ? toLocalInput(new Date(ob.occurred_at)).slice(0, 10) : toLocalInput(new Date()).slice(0, 10));
+      box.innerHTML = `<div class="two"><div class="field"><label for="ob">${obLabel()}</label><input id="ob" class="num" inputmode="decimal" placeholder="0" value="${esc(val)}"></div>
+        <div class="field"><label for="obd">期初日期</label><input id="obd" type="date" value="${when}"></div></div>
+        <p class="hint" style="margin:0">${isLiabType($('#at', root).value) ? '信用卡、應付款項填「目前欠多少」，用正數即可。' : '開始記帳那天帳戶裡的金額。'}${a ? '　要對帳現在的餘額請用<button type="button" class="linkbtn" id="toRec">盤點</button>。' : ''}</p>`;
+      const tr = $('#toRec', root); if (tr) tr.onclick = () => reconcile();
+    };
+    $('#at', root).addEventListener('change', drawOb);
+    if (!a) drawOb();
+    else {
+      const r = await sb.from('transactions').select('id,amount,occurred_at').eq('ledger_id', S.ledger.id).eq('account_id', a.id).eq('kind', 'opening_balance').order('occurred_at');
+      if (!r.error) {
+        if (r.data.length > 1) { obEditable = false; $('#obox', root).innerHTML = `<p class="hint">這個帳戶有 ${r.data.length} 筆期初餘額紀錄（合計 ${money(r.data.reduce((s, x) => s + +x.amount, 0), a.currency)}），請在帳戶明細裡個別修改，或用<button type="button" class="linkbtn" id="toRec2">盤點</button>對帳。</p>`; $('#toRec2', root).onclick = () => reconcile(); }
+        else { ob = r.data[0] || null; drawOb(); }
+      }
+    }
+    $('#af', root).onsubmit = async e => {
+      e.preventDefault();
+      const name = $('#an', root).value.trim(); if (!name) return err('請輸入名稱。');
+      const t = $('#at', root).value;
+      const row = { name, account_type: t, nature: natureOf(t), currency: $('#ac', root).value, memo: $('#am', root).value.trim() || null };
+      if (a) row.hidden = $('#ah', root).checked;
+      if (!a || groupTypes(a.account_type) !== groupTypes(t)) row.sort_order = nextSort(groupAccts(groupTypes(t)));
+      let obAmt = null, obWhen = null;
+      if (obEditable && $('#ob', root)) {
+        const raw = $('#ob', root).value.replace(/,/g, '').trim();
+        if (raw !== '') { const n = parseFloat(raw); if (!isFinite(n)) return err('期初金額格式不對。'); obAmt = n * (isLiabType(t) ? -1 : 1); }
+        const d = $('#obd', root).value; obWhen = d ? new Date(d + 'T00:00') : new Date();
+        if (isNaN(obWhen)) return err('期初日期格式不對。');
+      }
+      const r = a ? await sb.from('accounts').update(row).eq('id', a.id) : await sb.from('accounts').insert({ ...row, ledger_id: S.ledger.id }).select().single();
+      if (r.error) return err(r.error.message);
+      const accId = a ? a.id : r.data.id;
+      if (obEditable) {
+        let q = null;
+        if (ob && (obAmt === null || obAmt === 0)) q = sb.from('transactions').delete().eq('id', ob.id);
+        else if (ob) q = sb.from('transactions').update({ amount: obAmt, occurred_at: obWhen.toISOString() }).eq('id', ob.id);
+        else if (obAmt) q = sb.from('transactions').insert({ ledger_id: S.ledger.id, kind: 'opening_balance', account_id: accId, amount: obAmt, occurred_at: obWhen.toISOString(), memo: '期初餘額' });
+        if (q) { const x = await q; if (x.error) return err('帳戶已儲存，但期初餘額沒存成功：' + x.error.message); }
+      }
+      toast(a ? '已更新帳戶' : '已新增帳戶'); await after();
+    };
+    const del = $('#adel', root);
+    if (del) del.onclick = async () => {
+      if (!del.dataset.armed) { del.dataset.armed = 1; del.textContent = '再按一次刪除'; return; }
+      const r = await sb.from('accounts').delete().eq('id', a.id);
+      if (r.error) { delete del.dataset.armed; del.textContent = '刪除'; return err(r.error.code === '23503' ? '這個帳戶有交易紀錄，不能刪除。可以改成勾選「隱藏」。' : r.error.message); }
+      toast('已刪除帳戶'); await after();
+    };
+  });
 }
 async function openAccount(id) {
   const a = acct(id);
-  openSheet(`<div class="sheethead"><h2>${esc(a.name)}</h2><button class="iconbtn" data-close aria-label="關閉">✕</button></div>
-    <div class="card" style="box-shadow:none;padding:0 0 12px"><small class="muted">目前餘額</small><div class="num bigtotal">${money(S.bal.get(id) || 0, a.currency)}</div></div>
+  openSheet(`<div class="sheethead"><h2>${esc(a.name)}</h2><span style="flex:1"></span><button class="btn small ghost" id="aedit">編輯</button><button class="iconbtn" data-close aria-label="關閉">✕</button></div>
+    <div class="card" style="box-shadow:none;padding:0 0 12px"><small class="muted">${isInv(a) ? '持有成本' : '目前餘額'}</small><div class="num bigtotal">${money(S.bal.get(id) || 0, a.currency)}</div>
+      ${isInv(a) ? posLine(id, a.currency) : ''}</div>
+    ${isInv(a) ? `<div class="actions4" style="grid-template-columns:repeat(3,1fr);margin-bottom:12px"><button data-trade="buy">買進</button><button data-trade="sell">賣出</button><button data-trade="seed">補登股數</button></div>` : ''}
     <div id="acctTx"><div class="spinner">載入中…</div></div>`, async root => {
+    $$('[data-trade]', root).forEach(b => b.onclick = () => b.dataset.trade === 'seed' ? seedShares(id) : openForm({ mode: 'invest', side: b.dataset.trade, invId: id }));
+    $('#aedit', root).onclick = () => editAccount(id);
     const r = await sb.from('transactions').select(TX_COLS).eq('ledger_id', S.ledger.id).or(`account_id.eq.${id},to_account_id.eq.${id}`).order('occurred_at', { ascending: false }).limit(200);
     if (r.error) return fail(r.error);
     const box = $('#acctTx', root);
@@ -587,37 +987,66 @@ async function openPerson(id) {
   });
 }
 
-/* ---------- 報表 ---------- */
+/* ---------- 損益表 ---------- */
 async function viewReport() {
-  const v = $('#view'), m = S.month, L = S.ledger.id;
-  v.innerHTML = `<div class="card"><div class="monthbar"><button id="prev" aria-label="上個月">‹</button><strong>${m.getFullYear()} 年 ${m.getMonth() + 1} 月</strong><button id="next" aria-label="下個月">›</button></div></div>
-    <div class="seg" role="group"><button data-k="expense" aria-pressed="${(S.rk || 'expense') === 'expense'}">支出分類</button><button data-k="income" aria-pressed="${S.rk === 'income'}">收入分類</button></div>
-    <div class="card" id="cats"><div class="spinner">計算中…</div></div>
-    <div class="sectionhead"><h2>近 12 個月</h2><span class="hint">台幣帳戶</span></div>
+  const v = $('#view'), L = S.ledger.id, m = S.month, yearMode = S.rp === 'year';
+  const pStart = yearMode ? new Date(m.getFullYear(), 0, 1) : m, pEnd = yearMode ? new Date(m.getFullYear() + 1, 0, 1) : addMonths(m, 1);
+  const tStart = yearMode ? pStart : addMonths(m, -11), tEnd = yearMode ? pEnd : addMonths(m, 1);
+  const label = yearMode ? `${m.getFullYear()} 年` : `${m.getFullYear()} 年 ${m.getMonth() + 1} 月`;
+  v.innerHTML = `<div class="seg" role="group"><button data-p="month" aria-pressed="${!yearMode}">月</button><button data-p="year" aria-pressed="${yearMode}">年</button></div>
+    <div class="card"><div class="monthbar"><button id="prev" aria-label="上一期">‹</button><strong>${label}</strong><button id="next" aria-label="下一期">›</button></div></div>
+    <div class="card" id="stmt"><div class="spinner">計算中…</div></div>
+    <div class="sectionhead"><h2>${yearMode ? '各月收支' : '近 12 個月'}</h2><span class="hint">台幣帳戶</span></div>
     <div class="card" id="trend"><div class="spinner">計算中…</div></div>`;
-  $('#prev').onclick = () => { S.month = addMonths(S.month, -1); viewReport(); };
-  $('#next').onclick = () => { S.month = addMonths(S.month, 1); viewReport(); };
-  $$('.seg button', v).forEach(b => b.onclick = () => { S.rk = b.dataset.k; viewReport(); });
-  const kind = S.rk || 'expense';
-  const start = addMonths(m, -11), end = addMonths(m, 1);
-  const rows = await fetchAll(() => sb.from('transactions').select('kind,occurred_at,account_id,amount,category_id').eq('ledger_id', L)
-    .in('kind', ['expense', 'income']).gte('occurred_at', start.toISOString()).lt('occurred_at', end.toISOString()).order('id'));
-  const tw = rows.filter(t => (acct(t.account_id)?.currency || 'TWD') === 'TWD');
-  // 分類（歸到第一層）
-  const thisMonth = tw.filter(t => t.kind === kind && new Date(t.occurred_at) >= m);
-  const byCat = new Map();
-  for (const t of thisMonth) { const c = S.catMap.get(t.category_id); const top = c?.parent_id ? S.catMap.get(c.parent_id) : c; const k = top?.name || '未分類'; byCat.set(k, (byCat.get(k) || 0) + +t.amount); }
-  const list = [...byCat].sort((a, b) => b[1] - a[1]); const total = list.reduce((s, x) => s + x[1], 0); const max = list[0]?.[1] || 1;
-  $('#cats').innerHTML = list.length ? `<div style="display:flex;justify-content:space-between;margin-bottom:12px"><span class="muted">合計</span><span class="num ${kind === 'expense' ? 'exp' : 'inc'}">${money(total)}</span></div>
-    <div class="bars">${list.map(([n, x]) => `<div class="bar"><span>${esc(n)}</span><span class="track"><span class="fill ${kind === 'income' ? 'inc' : ''}" style="width:${(x / max * 100).toFixed(1)}%;display:block"></span></span><span class="num">${money(x)} <small class="muted">${Math.round(x / total * 100)}%</small></span></div>`).join('')}</div>`
-    : '<div class="empty">這個月沒有台幣帳戶的' + (kind === 'expense' ? '支出' : '收入') + '。</div>';
-  // 12 個月趨勢
-  const months = Array.from({ length: 12 }, (_, i) => addMonths(start, i));
-  const agg = months.map(mm => { const n = addMonths(mm, 1); const r = { e: 0, i: 0 }; for (const t of tw) { const d = new Date(t.occurred_at); if (d >= mm && d < n) r[t.kind === 'expense' ? 'e' : 'i'] += +t.amount; } return r; });
+  $$('[data-p]', v).forEach(b => b.onclick = () => { S.rp = b.dataset.p; viewReport(); });
+  $('#prev').onclick = () => { S.month = yearMode ? new Date(m.getFullYear() - 1, m.getMonth(), 1) : addMonths(m, -1); viewReport(); };
+  $('#next').onclick = () => { S.month = yearMode ? new Date(m.getFullYear() + 1, m.getMonth(), 1) : addMonths(m, 1); viewReport(); };
+  const [rows, sells] = await Promise.all([
+    fetchAll(() => sb.from('transactions').select('kind,occurred_at,account_id,amount,category_id').eq('ledger_id', L)
+      .in('kind', ['expense', 'income']).gte('occurred_at', tStart.toISOString()).lt('occurred_at', tEnd.toISOString()).order('id')),
+    fetchAll(() => sb.from('transactions').select('occurred_at,account_id,amount,to_amount').eq('ledger_id', L)
+      .eq('trade_side', 'sell').gte('occurred_at', tStart.toISOString()).lt('occurred_at', tEnd.toISOString()).order('id')),
+  ]);
+  const tw = id => (acct(id)?.currency || 'TWD') === 'TWD';
+  const inP = t => { const d = new Date(t.occurred_at); return d >= pStart && d < pEnd; };
+  const pRows = rows.filter(t => tw(t.account_id) && inP(t));
+  const realized = sells.filter(t => tw(t.account_id) && inP(t)).reduce((s, t) => s + ((t.to_amount ?? t.amount) - t.amount), 0);
+  // 依第一層分類加總，保留子分類明細
+  const tree = kind => {
+    const top = new Map();
+    for (const t of pRows.filter(t => t.kind === kind)) {
+      const c = S.catMap.get(t.category_id), p = c?.parent_id ? S.catMap.get(c.parent_id) : c;
+      const pk = p?.name || '未分類', ck = c && c.parent_id ? c.name : null;
+      const e = top.get(pk) || { sum: 0, kids: new Map() }; e.sum += +t.amount;
+      if (ck) e.kids.set(ck, (e.kids.get(ck) || 0) + +t.amount);
+      top.set(pk, e);
+    }
+    return [...top].sort((a, b) => b[1].sum - a[1].sum);
+  };
+  const inc = tree('income'), exp = tree('expense');
+  const incTot = inc.reduce((s, x) => s + x[1].sum, 0), expTot = exp.reduce((s, x) => s + x[1].sum, 0);
+  const net = incTot + realized - expTot;
+  const block = (list, cls) => list.map(([name, e]) => `<div class="st-r"><span>${esc(name)}</span><span class="num ${cls}">${money(e.sum)}</span></div>
+    ${[...e.kids].sort((a, b) => b[1] - a[1]).map(([k, x]) => `<div class="st-r st-sub"><span>${esc(k)}</span><span class="num">${money(x)}</span></div>`).join('')}`).join('');
+  $('#stmt').innerHTML = `<div class="stmt">
+    <div class="st-h">收入</div>${block(inc, '') || '<div class="st-r st-sub"><span>（無）</span><span></span></div>'}
+    <div class="st-t"><span>收入合計</span><span class="num inc">${money(incTot)}</span></div>
+    <div class="st-h">投資</div>
+    <div class="st-r"><span>已實現損益</span><span class="num ${realized >= 0 ? 'inc' : 'exp'}">${money(realized, 'TWD', true)}</span></div>
+    <div class="st-h">支出</div>${block(exp, '') || '<div class="st-r st-sub"><span>（無）</span><span></span></div>'}
+    <div class="st-t"><span>支出合計</span><span class="num exp">${money(expTot)}</span></div>
+    <div class="st-net"><span>本期淨利</span><span class="num ${net >= 0 ? 'inc' : 'exp'}">${money(net, 'TWD', true)}</span></div>
+  </div>`;
+  // 趨勢
+  const months = Array.from({ length: 12 }, (_, i) => addMonths(tStart, i));
+  const agg = months.map(mm => { const n = addMonths(mm, 1), r = { e: 0, i: 0 }, w = t => { const d = new Date(t.occurred_at); return d >= mm && d < n; };
+    for (const t of rows) if (tw(t.account_id) && w(t)) r[t.kind === 'expense' ? 'e' : 'i'] += +t.amount;
+    for (const t of sells) if (tw(t.account_id) && w(t)) r.i += (t.to_amount ?? t.amount) - t.amount;
+    return r; });
   const top = Math.max(1, ...agg.flatMap(a => [a.e, a.i]));
   const step = niceStep(top / 4), yMax = Math.ceil(top / step) * step;
-  const W = 600, H = 220, pl = 48, pb = 24, pt = 10, cw = (W - pl - 8) / 12, y = val => pt + (H - pt - pb) * (1 - val / yMax);
-  let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="近 12 個月收支">`;
+  const W = 600, H = 220, pl = 48, pb = 24, pt = 10, cw = (W - pl - 8) / 12, y = val => pt + (H - pt - pb) * (1 - Math.max(0, val) / yMax);
+  let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="各月收支">`;
   for (let g = 0; g <= yMax + 1e-9; g += step) svg += `<line x1="${pl}" x2="${W - 4}" y1="${y(g)}" y2="${y(g)}" stroke="var(--line)" stroke-width="1"/><text x="${pl - 6}" y="${y(g) + 4}" text-anchor="end">${g >= 1000 ? nf.format(g / 1000) + 'k' : g}</text>`;
   agg.forEach((a, i) => {
     const x = pl + i * cw + cw * 0.15, bw = cw * 0.33;
@@ -626,62 +1055,274 @@ async function viewReport() {
     svg += `<text x="${pl + i * cw + cw / 2}" y="${H - 6}" text-anchor="middle">${months[i].getMonth() + 1}月</text>`;
   });
   svg += '</svg>';
-  $('#trend').innerHTML = `<div style="overflow-x:auto">${svg}</div><div class="extra"><span class="exp">■</span> 支出　<span class="inc">■</span> 收入</div>`;
+  $('#trend').innerHTML = `<div style="overflow-x:auto">${svg}</div><div class="extra"><span class="exp">■</span> 支出　<span class="inc">■</span> 收入（含已實現投資損益）</div>`;
 }
 function niceStep(x) { const p = Math.pow(10, Math.floor(Math.log10(x || 1))); for (const k of [1, 2, 5, 10]) if (k * p >= x) return k * p; return 10 * p; }
 
+/* ---------- 投資 ---------- */
+function posLine(id, cur) {
+  const p = S.pos.get(id) || {}, cost = S.bal.get(id) || 0, parts = [];
+  parts.push(p.shares == null ? '股數未記錄' : `持有 ${qf.format(p.shares)} 股`);
+  if (p.shares > 0) parts.push(`平均成本 ${money(cost / p.shares, cur)}`);
+  if (p.realized) parts.push(`已實現損益 <span class="num ${p.realized > 0 ? 'inc' : 'exp'}">${money(p.realized, cur, true)}</span>`);
+  return `<div class="extra">${parts.join('　')}</div>`;
+}
+async function viewInvest() {
+  const v = $('#view'), L = S.ledger.id, yStart = new Date(new Date().getFullYear(), 0, 1);
+  const invs = S.accts.filter(a => isInv(a) && !a.hidden).map(a => ({ a, cost: S.bal.get(a.id) || 0, p: S.pos.get(a.id) || {} }));
+  const held = invs.filter(x => S.invAll || Math.abs(x.cost) >= 0.005 || x.p.shares > 0);
+  held.sort((x, y) => y.cost - x.cost);
+  const totCost = invs.filter(x => x.a.currency === 'TWD').reduce((s, x) => s + x.cost, 0);
+  const totReal = invs.filter(x => x.a.currency === 'TWD').reduce((s, x) => s + (x.p.realized || 0), 0);
+  v.innerHTML = `
+    <div class="card"><div class="summary" style="grid-template-columns:1fr 1fr">
+      <div><small>持有成本（台幣）</small><span class="num bigtotal">${money(totCost)}</span></div>
+      <div><small>今年已實現損益</small><span class="num bigtotal" id="ytd">…</span></div></div>
+      <div class="extra">累計已實現損益 <span class="num ${totReal >= 0 ? 'inc' : 'exp'}">${money(totReal, 'TWD', true)}</span>。只算買賣差額，不做市值評價。</div></div>
+    <div class="actions4" style="grid-template-columns:1fr 1fr"><button data-side="buy">買進<small>資金 → 投資帳戶</small></button><button data-side="sell">賣出<small>投資帳戶 → 資金，算損益</small></button></div>
+    <div class="sectionhead"><h2>持有部位</h2><label class="toggle"><input type="checkbox" id="invall" ${S.invAll ? 'checked' : ''}> 顯示全部</label></div>
+    ${held.length ? `<div class="list">${held.map(({ a, cost, p }) => `<button class="row" data-acct="${a.id}"><span class="main"><span class="t">${esc(a.name)}</span>
+      <span class="s">${p.shares == null ? '股數未記錄' : qf.format(p.shares) + ' 股'}${p.shares > 0 ? '・均價 ' + money(cost / p.shares, a.currency) : ''}</span></span>
+      <span class="amt"><span class="num">${money(cost, a.currency)}</span>${p.realized ? `<small class="${p.realized > 0 ? 'inc' : 'exp'}">已實現 ${money(p.realized, a.currency, true)}</small>` : ''}</span></button>`).join('')}</div>`
+      : '<div class="card empty">目前沒有持有部位。按「買進」記第一筆。</div>'}
+    <div class="sectionhead"><h2>最近買賣</h2></div>
+    <div id="trades"><div class="spinner">載入中…</div></div>`;
+  $$('[data-side]', v).forEach(b => b.onclick = () => openForm({ mode: 'invest', side: b.dataset.side }));
+  $$('[data-acct]', v).forEach(b => b.onclick = () => openAccount(+b.dataset.acct));
+  $('#invall').onchange = e => { S.invAll = e.target.checked; viewInvest(); };
+  const [ytd, recent] = await Promise.all([
+    fetchAll(() => sb.from('transactions').select('account_id,amount,to_amount').eq('ledger_id', L).eq('trade_side', 'sell').gte('occurred_at', yStart.toISOString()).order('id')),
+    sb.from('transactions').select(TX_COLS).eq('ledger_id', L).in('trade_side', ['buy', 'sell']).order('occurred_at', { ascending: false }).limit(30),
+  ]);
+  if (recent.error) throw recent.error;
+  const y = ytd.filter(t => (acct(t.account_id)?.currency || 'TWD') === 'TWD').reduce((s, t) => s + ((t.to_amount ?? t.amount) - t.amount), 0);
+  const ye = $('#ytd'); if (ye) { ye.textContent = money(y, 'TWD', true); ye.className = 'num bigtotal ' + (y >= 0 ? 'inc' : 'exp'); }
+  const box = $('#trades'); if (!box) return;
+  box.innerHTML = recent.data.length ? `<div class="list">${recent.data.map(t => txRow(t, { showDate: true })).join('')}</div>` : '<div class="card empty">還沒有買賣紀錄。</div>';
+  bindRows(box, recent.data);
+}
+function seedShares(id) {
+  const a = acct(id), p = S.pos.get(id) || {};
+  openSheet(`<div class="sheethead"><h2>補登股數</h2><button class="iconbtn" data-close aria-label="關閉">✕</button></div>
+    <form class="form" id="sf">
+      <p class="hint">從隨手記匯入的投資帳戶只有金額、沒有股數。填上現在實際持有的股數，之後賣出就能自動算平均成本。這筆不會改變帳戶金額。</p>
+      <div class="field"><label for="sq">${esc(a.name)} 目前持有股數</label><input id="sq" class="num" inputmode="decimal" value="${p.shares ?? ''}"></div>
+      <p class="hint" id="serr" style="color:var(--inc)"></p>
+      <button class="btn" type="submit">儲存</button></form>`, root => {
+    $('#sf', root).onsubmit = async e => {
+      e.preventDefault();
+      const target = parseFloat($('#sq', root).value.replace(/,/g, ''));
+      if (!(target >= 0)) { $('#serr', root).textContent = '請輸入股數。'; return; }
+      const diff = target - (p.shares || 0);
+      if (Math.abs(diff) < 1e-9) { closeSheet(); return; }
+      const { error } = await sb.from('transactions').insert({ ledger_id: S.ledger.id, kind: 'balance_adjustment', account_id: id, amount: 0,
+        quantity: Math.abs(diff), trade_side: diff > 0 ? 'buy' : 'sell', occurred_at: new Date().toISOString(), memo: '補登股數' });
+      if (error) return fail(error);
+      closeSheet(); toast('已更新股數'); await reloadAll();
+    };
+  });
+}
+
 /* ---------- 記一筆 / 編輯 ---------- */
 function acctOptions(filter, selected) {
-  const groups = [...GROUPS, ['其他', null]]; let html = ''; const used = new Set();
-  for (const [name, types] of groups) {
-    const list = S.accts.filter(a => !used.has(a.id) && (types ? types.includes(a.account_type) : true) && filter(a) && (!a.hidden || a.id === selected));
-    list.forEach(a => used.add(a.id));
+  let html = '';
+  for (const [name, types] of allGroups()) {
+    const list = groupAccts(types, a => filter(a) && (!a.hidden || a.id === selected));
     if (list.length) html += `<optgroup label="${name}">${list.map(a => `<option value="${a.id}" ${a.id === selected ? 'selected' : ''}>${esc(a.name)}${a.currency !== 'TWD' ? '（' + a.currency + '）' : ''}</option>`).join('')}</optgroup>`;
   }
   return html;
 }
-function catOptions(kind, selected) {
-  const tops = S.cats.filter(c => c.kind === kind && !c.parent_id && (!c.hidden || c.id === selected));
+const catTops = kind => S.cats.filter(c => c.kind === kind && !c.parent_id).sort(bySort);
+const catKids = pid => S.cats.filter(c => c.parent_id === pid).sort(bySort);
+function catOptions(kind, selected, allowNew = false) {
+  const tops = catTops(kind).filter(c => !c.hidden || c.id === selected);
   return tops.map(p => {
-    const kids = S.cats.filter(c => c.parent_id === p.id && (!c.hidden || c.id === selected));
+    const kids = catKids(p.id).filter(c => !c.hidden || c.id === selected);
     if (!kids.length) return `<option value="${p.id}" ${p.id === selected ? 'selected' : ''}>${esc(p.name)}</option>`;
     return `<optgroup label="${esc(p.name)}">${p.id === selected ? `<option value="${p.id}" selected>${esc(p.name)}</option>` : ''}${kids.map(c => `<option value="${c.id}" ${c.id === selected ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</optgroup>`;
+  }).join('') + (allowNew ? `<option value="__new" ${selected === '__new' ? 'selected' : ''}>＋ 新增分類…</option>` : '');
+}
+async function createCategory(kind, name, parentId) {
+  name = (name || '').trim(); if (!name) throw new Error('請輸入新分類的名稱。');
+  const sibs = parentId ? catKids(parentId) : catTops(kind);
+  if (sibs.some(c => c.name === name)) throw new Error('同一層已經有這個分類。');
+  const { data, error } = await sb.from('categories').insert({ ledger_id: S.ledger.id, name, kind, parent_id: parentId || null, sort_order: nextSort(sibs) }).select().single();
+  if (error) throw error;
+  S.cats.push(data); S.catMap.set(data.id, data); return data.id;
+}
+
+/* ---------- 分類管理 ---------- */
+function manageCats(kind = S.ck || 'expense') {
+  S.ck = kind;
+  const mvBtns = (c, i, n) => `<button type="button" class="mv" data-mv="${c.id}" data-d="-1" ${i ? '' : 'disabled'} aria-label="上移">↑</button><button type="button" class="mv" data-mv="${c.id}" data-d="1" ${i < n - 1 ? '' : 'disabled'} aria-label="下移">↓</button>`;
+  const tops = catTops(kind);
+  const body = tops.map((p, i) => {
+    const kids = catKids(p.id);
+    return `<div class="list"><div class="row mrow${p.hidden ? ' ishidden' : ''}"><button type="button" class="mmain" data-edit="${p.id}"><span class="t" style="font-weight:700">${esc(p.name)}</span><span class="s">${kids.length} 個子分類${p.hidden ? '・已隱藏' : ''}</span></button>${mvBtns(p, i, tops.length)}</div>
+      ${kids.map((c, k) => `<div class="row mrow sub${c.hidden ? ' ishidden' : ''}"><button type="button" class="mmain" data-edit="${c.id}"><span class="t">${esc(c.name)}</span>${c.hidden ? '<span class="s">已隱藏</span>' : ''}</button>${mvBtns(c, k, kids.length)}</div>`).join('')}
+      <button type="button" class="row addsub" data-addsub="${p.id}">＋ 在「${esc(p.name)}」下新增子分類</button></div>`;
   }).join('');
+  openSheet(`<div class="sheethead"><h2>管理分類</h2><button class="iconbtn" data-close aria-label="關閉">✕</button></div>
+    <div class="form"><div class="seg" role="group"><button type="button" data-k="expense" aria-pressed="${kind === 'expense'}">支出</button><button type="button" data-k="income" aria-pressed="${kind === 'income'}">收入</button></div>
+      <button class="btn" id="cAdd">＋ 新增大分類</button>${body || '<div class="empty">還沒有分類。</div>'}</div>`, root => {
+    $$('[data-k]', root).forEach(b => b.onclick = () => manageCats(b.dataset.k));
+    $('#cAdd', root).onclick = () => editCat(null, { kind });
+    $$('[data-addsub]', root).forEach(b => b.onclick = () => editCat(null, { kind, parent: +b.dataset.addsub }));
+    $$('[data-edit]', root).forEach(b => b.onclick = () => editCat(+b.dataset.edit));
+    $$('[data-mv]', root).forEach(b => b.onclick = async () => {
+      const c = S.catMap.get(+b.dataset.mv);
+      try { await reorder('categories', c.parent_id ? catKids(c.parent_id) : catTops(c.kind), c.id, +b.dataset.d); manageCats(kind); } catch (e) { fail(e); }
+    });
+  });
+}
+function editCat(id, { kind, parent } = {}) {
+  const c = id ? S.catMap.get(id) : null; kind = c?.kind || kind;
+  const curParent = c ? c.parent_id : parent ?? null, hasKids = c && catKids(c.id).length > 0;
+  const parents = catTops(kind).filter(p => p.id !== id);
+  openSheet(`<div class="sheethead"><h2>${c ? '編輯分類' : '新增分類'}</h2><button class="iconbtn" data-close aria-label="關閉">✕</button></div>
+    <form class="form" id="cf">
+      <div class="field"><label for="cn">名稱</label><input id="cn" required value="${esc(c?.name || '')}"></div>
+      <div class="field"><label for="cp">上層分類</label><select id="cp" ${hasKids ? 'disabled' : ''}><option value="">（無，作為大分類）</option>${parents.map(p => `<option value="${p.id}" ${p.id === curParent ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select>
+        ${hasKids ? '<span class="hint">這個大分類底下有子分類，不能再放到別的分類下。</span>' : ''}</div>
+      ${c ? `<label class="toggle"><input type="checkbox" id="ch" ${c.hidden ? 'checked' : ''}> 隱藏（不出現在記帳選單，舊紀錄保留）</label>` : ''}
+      <p class="hint" id="cerr" style="color:var(--inc)"></p>
+      <div class="formbtns">${c ? '<button type="button" class="btn danger" id="cdel">刪除</button>' : ''}<button class="btn" type="submit">儲存</button></div>
+    </form>`, root => {
+    const err = m => $('#cerr', root).textContent = m;
+    $('#cf', root).onsubmit = async e => {
+      e.preventDefault();
+      const name = $('#cn', root).value.trim(), pid = +$('#cp', root).value || null;
+      try {
+        if (!c) await createCategory(kind, name, pid);
+        else {
+          if (!name) return err('請輸入名稱。');
+          const row = { name, hidden: $('#ch', root).checked };
+          if (!hasKids && pid !== c.parent_id) { row.parent_id = pid; row.sort_order = nextSort(pid ? catKids(pid) : catTops(kind)); }
+          const r = await sb.from('categories').update(row).eq('id', c.id); if (r.error) throw r.error;
+        }
+        await loadRef(); toast(c ? '已更新分類' : '已新增分類'); manageCats(kind);
+      } catch (er) { err(er.message || String(er)); }
+    };
+    const del = $('#cdel', root);
+    if (del) del.onclick = async () => {
+      if (!del.dataset.armed) { del.dataset.armed = 1; del.textContent = '再按一次刪除'; return; }
+      const r = await sb.from('categories').delete().eq('id', c.id);
+      if (r.error) { delete del.dataset.armed; del.textContent = '刪除'; return err(r.error.code === '23503' ? '這個分類有紀錄或子分類，不能刪除。可以改成勾選「隱藏」。' : r.error.message); }
+      await loadRef(); toast('已刪除分類'); manageCats(kind);
+    };
+  });
 }
 function cpOptions(selected) { return `<option value="">（選擇對象）</option>${S.cps.filter(c => !c.hidden || c.id === selected).map(c => `<option value="${c.id}" ${c.id === selected ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}<option value="__new">＋ 新增對象…</option>`; }
 function defaultDebt(type, cur) { const l = S.accts.filter(a => a.account_type === type); return (l.find(a => a.currency === cur) || l[0])?.id; }
 
-function openForm({ mode, tx, loanType: lt0, cpId, accountId } = {}) {
-  // 由既有交易推回表單狀態
-  const st = { mode: mode || 'expense', amount: '', to_amount: '', when: toLocalInput(new Date()), memo: '', cat: null, acc: null, from: null, to: null, lt: lt0 || 'lend', cp: cpId ?? null, my: null, debt: null };
+function journalOptions(selected) {
+  let html = acctOptions(() => true, null).replace(/value="(\d+)"/g, 'value="a:$1"');
+  const catGroup = (kind, label) => {
+    const opts = [];
+    for (const p of S.cats.filter(c => c.kind === kind && !c.parent_id && !c.hidden)) {
+      const kids = S.cats.filter(c => c.parent_id === p.id && !c.hidden);
+      if (!kids.length) opts.push([p.id, p.name]); else kids.forEach(c => opts.push([c.id, `${p.name} › ${c.name}`]));
+    }
+    return `<optgroup label="${label}">${opts.map(([id, n]) => `<option value="c:${id}">${esc(n)}</option>`).join('')}</optgroup>`;
+  };
+  html += catGroup('expense', '支出分類') + catGroup('income', '收入分類');
+  return `<option value="">（選擇）</option>` + (selected ? html.replace(`value="${selected}"`, `value="${selected}" selected`) : html);
+}
+// 自由分錄 → 資料表欄位
+function mapJournal(dr, cr, amt) {
+  if (!dr || !cr) return { err: '請選擇借方和貸方。' };
+  if (dr === cr) return { err: '借方和貸方不能相同。' };
+  const [dt, di] = dr.split(':'), [ct, ci] = cr.split(':'), D = +di, C = +ci;
+  const catKind = id => S.catMap.get(id)?.kind;
+  if (dt === 'a' && ct === 'a') {
+    if (acct(D).currency !== acct(C).currency) return { err: '兩個帳戶幣別不同，請改用「轉帳」分頁填轉入金額。' };
+    return { row: { kind: 'transfer', account_id: C, to_account_id: D, amount: amt, to_amount: amt, category_id: null }, desc: `轉帳：${acct(C).name} → ${acct(D).name}` };
+  }
+  if (dt === 'c' && ct === 'a' && catKind(D) === 'expense') return { row: { kind: 'expense', account_id: C, category_id: D, amount: amt }, desc: '一般支出' };
+  if (dt === 'a' && ct === 'c' && catKind(C) === 'income') return { row: { kind: 'income', account_id: D, category_id: C, amount: amt }, desc: '一般收入' };
+  if (dt === 'a' && ct === 'c' && catKind(C) === 'expense') return { row: { kind: 'expense', account_id: D, category_id: C, amount: -amt }, desc: '支出沖銷（退款），會減少該分類的支出' };
+  if (dt === 'c' && ct === 'a' && catKind(D) === 'income') return { row: { kind: 'income', account_id: C, category_id: D, amount: -amt }, desc: '收入沖回，會減少該分類的收入' };
+  return { err: '借方和貸方至少要有一邊是帳戶。' };
+}
+
+function openForm({ mode, tx, loanType: lt0, cpId, accountId, side, invId } = {}) {
+  const st = { mode: mode || 'expense', amount: '', to_amount: '', when: toLocalInput(new Date()), memo: '', cat: null, acc: null, from: null, to: null,
+               lt: lt0 || 'lend', cp: cpId ?? null, my: null, debt: null, dr: '', cr: '',
+               side: side || 'buy', inv: invId ?? null, cash: null, qty: '', price: '', fee: '', cost: '', costTouched: false, newInv: '' };
   if (tx) {
     const A = acct(tx.account_id), B = acct(tx.to_account_id), lt = loanType(tx);
     Object.assign(st, { when: toLocalInput(new Date(tx.occurred_at)), memo: tx.memo || '', cp: tx.counterparty_id });
-    if (lt) { const L = LOAN[lt]; Object.assign(st, { mode: 'loan', lt, my: L.dir === 'out' ? A.id : B.id, debt: L.dir === 'out' ? B.id : A.id,
+    if (tx.trade_side && tx.kind === 'transfer') {
+      const buy = tx.trade_side === 'buy';
+      Object.assign(st, { mode: 'invest', side: tx.trade_side, inv: buy ? B.id : A.id, cash: buy ? A.id : B.id, qty: tx.quantity ?? '', price: tx.unit_price ?? '', fee: tx.fee ?? '',
+        cost: buy ? '' : tx.amount, costTouched: !buy });
+    } else if (tx.trade_side) Object.assign(st, { mode: 'other', acc: A.id, amount: tx.amount });
+    else if (lt) { const L = LOAN[lt]; Object.assign(st, { mode: 'loan', lt, my: L.dir === 'out' ? A.id : B.id, debt: L.dir === 'out' ? B.id : A.id,
       amount: L.dir === 'out' ? tx.amount : (tx.to_amount ?? tx.amount), to_amount: L.dir === 'out' ? (tx.to_amount ?? '') : tx.amount }); }
     else if (tx.kind === 'transfer') Object.assign(st, { mode: 'transfer', from: A.id, to: B.id, amount: tx.amount, to_amount: tx.to_amount ?? '' });
+    else if ((tx.kind === 'expense' || tx.kind === 'income') && tx.amount < 0) {
+      const a = 'a:' + A.id, c = 'c:' + tx.category_id;
+      Object.assign(st, { mode: 'journal', amount: -tx.amount, dr: tx.kind === 'expense' ? a : c, cr: tx.kind === 'expense' ? c : a });
+    }
     else if (tx.kind === 'expense' || tx.kind === 'income') Object.assign(st, { mode: tx.kind, acc: A.id, cat: tx.category_id, amount: tx.amount });
     else Object.assign(st, { mode: 'other', acc: A.id, amount: tx.amount });
   }
   const last = LS.get('last', {});
-  st.acc ??= accountId ?? last[st.mode] ?? S.accts.find(a => !isDebt(a) && !a.hidden)?.id;
-  st.my ??= last.loan ?? S.accts.find(a => !isDebt(a) && !a.hidden)?.id;
+  const firstPlain = S.accts.find(a => !isDebt(a) && !isInv(a) && !a.hidden)?.id;
+  st.acc ??= accountId ?? last[st.mode] ?? firstPlain;
+  st.my ??= last.loan ?? firstPlain;
   st.from ??= last.transfer ?? S.accts.find(a => !a.hidden)?.id;
+  st.cash ??= last.invest ?? S.accts.find(a => a.account_type === 'bank' && !a.hidden)?.id ?? firstPlain;
+  st.inv ??= S.accts.find(a => isInv(a) && !a.hidden && (S.bal.get(a.id) || 0) > 0)?.id ?? S.accts.find(a => isInv(a) && !a.hidden)?.id ?? '__new';
+
+  const num = v => parseFloat(String(v ?? '').replace(/,/g, ''));
+  const avgCost = () => { const p = S.pos.get(+st.inv), c = S.bal.get(+st.inv) || 0; return p && p.shares > 0 ? c / p.shares : null; };
+  const calcInv = () => {
+    const q = num(st.qty), pr = num(st.price), f = num(st.fee) || 0, gross = (q || 0) * (pr || 0);
+    if (st.side === 'buy') return { total: Math.round((gross + f) * 100) / 100 };
+    const proceeds = Math.round((gross - f) * 100) / 100;
+    const ac = avgCost();
+    if (!st.costTouched) st.cost = ac != null && q > 0 ? String(Math.round(ac * q * 100) / 100) : st.cost;
+    const cost = num(st.cost);
+    return { proceeds, cost, pl: isFinite(cost) ? Math.round((proceeds - cost) * 100) / 100 : null, ac };
+  };
 
   const render = () => {
-    const tabs = [['expense', '支出'], ['income', '收入'], ['transfer', '轉帳'], ['loan', '借貸']];
+    const tabs = [['expense', '支出'], ['income', '收入'], ['transfer', '轉帳'], ['invest', '投資'], ['journal', '分錄']];
+    if (st.mode === 'loan') tabs.push(['loan', '借貸']);
     let body = '';
     if (st.mode === 'expense' || st.mode === 'income') {
       const a = acct(+st.acc);
-      body = `<div class="field"><label for="fcat">分類</label><select id="fcat">${catOptions(st.mode, st.cat)}</select></div>
+      body = `<div class="field"><label for="fcat">分類</label><select id="fcat">${catOptions(st.mode, st.cat, true)}</select></div>
+        <div class="two" id="fcatnw" ${st.cat === '__new' ? '' : 'hidden'}><div class="field"><label for="fcatn">新分類名稱</label><input id="fcatn" value="${esc(st.newCat || '')}"></div>
+          <div class="field"><label for="fcatp">放在</label><select id="fcatp"><option value="">（作為大分類）</option>${catTops(st.mode).filter(p => !p.hidden).map(p => `<option value="${p.id}" ${p.id === st.newCatP ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></div></div>
         <div class="field"><label for="facc">帳戶</label><select id="facc">${acctOptions(() => true, +st.acc)}</select></div>
         ${isDebt(a) ? `<div class="field"><label for="fcp">借貸對象（${st.mode === 'expense' ? '誰代付' : '誰'}）</label><select id="fcp">${cpOptions(st.cp)}</select></div><div class="field" id="fcpnw" hidden><label for="fcpn">新對象名字</label><input id="fcpn"></div>` : ''}`;
     } else if (st.mode === 'transfer') {
       const A = acct(+st.from), B = acct(+st.to);
-      body = `<div class="two"><div class="field"><label for="ffrom">從</label><select id="ffrom">${acctOptions(() => true, +st.from)}</select></div>
-        <div class="field"><label for="fto">到</label><select id="fto"><option value="">（選擇）</option>${acctOptions(() => true, +st.to)}</select></div></div>
+      body = `<div class="two"><div class="field"><label for="ffrom">從（貸方）</label><select id="ffrom">${acctOptions(() => true, +st.from)}</select></div>
+        <div class="field"><label for="fto">到（借方）</label><select id="fto"><option value="">（選擇）</option>${acctOptions(() => true, +st.to)}</select></div></div>
         ${A && B && A.currency !== B.currency ? `<div class="field"><label for="fto_amt">轉入金額（${B.currency}）</label><input id="fto_amt" class="num" inputmode="decimal" value="${esc(st.to_amount)}"></div>` : ''}
-        ${isDebt(A) || isDebt(B) ? '<p class="hint">涉及應收／應付帳戶，建議改用「借貸」分頁記錄，才會算到對象身上。</p>' : ''}`;
+        ${isInv(B) || isInv(A) ? '<p class="hint">要記股數和損益的話，請用「投資」分頁。</p>' : ''}`;
+    } else if (st.mode === 'journal') {
+      const m = mapJournal(st.dr, st.cr, 1);
+      body = `<p class="hint" style="margin:0">借方是資金的去處或費用，貸方是資金的來源或收入。</p>
+        <div class="field"><label for="fdr">借方</label><select id="fdr">${journalOptions(st.dr)}</select></div>
+        <div class="field"><label for="fcr">貸方</label><select id="fcr">${journalOptions(st.cr)}</select></div>
+        <p class="hint" id="jhint">${st.dr && st.cr ? esc(m.err || '會記成：' + m.desc) : ''}</p>`;
+    } else if (st.mode === 'invest') {
+      const I = st.inv === '__new' ? null : acct(+st.inv), Cc = acct(+st.cash), c = calcInv(), p = I ? S.pos.get(I.id) : null;
+      body = `<div class="seg" role="group"><button type="button" data-side="buy" aria-pressed="${st.side === 'buy'}">買進</button><button type="button" data-side="sell" aria-pressed="${st.side === 'sell'}">賣出</button></div>
+        <div class="two"><div class="field"><label for="finv">投資帳戶</label><select id="finv">${acctOptions(isInv, +st.inv)}<option value="__new" ${st.inv === '__new' ? 'selected' : ''}>＋ 新增投資帳戶…</option></select></div>
+          <div class="field"><label for="fcash">${st.side === 'buy' ? '付款帳戶' : '入帳帳戶'}</label><select id="fcash">${acctOptions(a => !isInv(a) && !isDebt(a), +st.cash)}</select></div></div>
+        ${st.inv === '__new' ? `<div class="field"><label for="fnewinv">新帳戶名稱（例如股票名稱）</label><input id="fnewinv" value="${esc(st.newInv)}" placeholder="例如：台積電 2330"></div>` : ''}
+        ${I && p ? `<p class="hint" style="margin:0">目前${p.shares == null ? '股數未記錄' : '持有 ' + qf.format(p.shares) + ' 股'}，成本 ${money(S.bal.get(I.id) || 0, I.currency)}${p.shares > 0 ? '，平均 ' + money((S.bal.get(I.id) || 0) / p.shares, I.currency) : ''}</p>` : ''}
+        <div class="two"><div class="field"><label for="fqty">股數</label><input id="fqty" class="num" inputmode="decimal" value="${esc(st.qty)}"></div>
+          <div class="field"><label for="fprice">成交價</label><input id="fprice" class="num" inputmode="decimal" value="${esc(st.price)}"></div></div>
+        <div class="field"><label for="ffee">${st.side === 'buy' ? '手續費' : '手續費＋交易稅'}</label><input id="ffee" class="num" inputmode="decimal" value="${esc(st.fee)}" placeholder="0"></div>
+        ${st.side === 'sell' ? `<div class="field"><label for="fcost">賣出部分的成本</label><input id="fcost" class="num" inputmode="decimal" value="${esc(st.cost)}">
+          <span class="hint">${c.ac != null ? `預設用平均成本 ${money(c.ac, I?.currency)} × 股數計算，可自行修改。` : '這個帳戶沒有股數紀錄，請自行填入成本（或先到帳戶裡補登股數）。'}</span></div>` : ''}
+        <div class="card" style="box-shadow:none;background:var(--bg);padding:12px" id="invsum"></div>`;
     } else if (st.mode === 'loan') {
       const L = LOAN[st.lt];
       if (!st.debt || acct(+st.debt)?.account_type !== L.debt) st.debt = defaultDebt(L.debt, acct(+st.my)?.currency);
@@ -695,13 +1336,14 @@ function openForm({ mode, tx, loanType: lt0, cpId, accountId } = {}) {
           <div class="field" style="margin-top:8px"><select id="fdebt" aria-label="債權債務帳戶">${acctOptions(a => a.account_type === L.debt, +st.debt)}</select></div></details>
         ${D && M && D.currency !== M.currency ? `<div class="field"><label for="fto_amt">換算後金額（${D.currency}）</label><input id="fto_amt" class="num" inputmode="decimal" value="${esc(st.to_amount)}"></div>` : ''}`;
     } else {
-      body = `<div class="field"><label for="facc">帳戶</label><select id="facc">${acctOptions(() => true, +st.acc)}</select></div><p class="hint">這是匯入的${tx.kind === 'opening_balance' ? '期初餘額' : '餘額調整'}，只能改金額、時間、備註。</p>`;
+      body = `<div class="field"><label for="facc">帳戶</label><select id="facc" disabled>${acctOptions(() => true, +st.acc)}</select></div><p class="hint">這是${tx.trade_side ? '補登股數' : tx.kind === 'opening_balance' ? '期初餘額' : '餘額調整'}紀錄，只能改${tx.trade_side ? '時間、備註，或刪除後重新補登' : '金額、時間、備註'}。</p>`;
     }
+    const showAmt = st.mode !== 'invest' && !(st.mode === 'other' && tx?.trade_side);
     $('#sheetBody').innerHTML = `
       <div class="sheethead"><h2>${tx ? '編輯紀錄' : '記一筆'}</h2><button class="iconbtn" data-close aria-label="關閉">✕</button></div>
       <form class="form" id="txf" novalidate>
-        ${st.mode === 'other' ? '' : `<div class="seg" role="group">${tabs.map(([k, n]) => `<button type="button" data-mode="${k}" aria-pressed="${st.mode === k}">${n}</button>`).join('')}</div>`}
-        <div class="field"><label for="famt">金額${st.mode === 'loan' ? '' : ''}</label><input id="famt" class="amount" inputmode="decimal" placeholder="0" value="${esc(st.amount)}" autocomplete="off"></div>
+        ${st.mode === 'other' ? '' : `<div class="seg tabs5" role="group">${tabs.map(([k, n]) => `<button type="button" data-mode="${k}" aria-pressed="${st.mode === k}">${n}</button>`).join('')}</div>`}
+        ${showAmt ? `<div class="field"><label for="famt">金額</label><input id="famt" class="amount" inputmode="decimal" placeholder="0" value="${esc(st.amount)}" autocomplete="off"></div>` : ''}
         ${body}
         <div class="two"><div class="field"><label for="fwhen">時間</label><input id="fwhen" type="datetime-local" value="${st.when}"></div>
           <div class="field"><label for="fmemo">備註</label><input id="fmemo" value="${esc(st.memo)}" placeholder="選填"></div></div>
@@ -710,65 +1352,123 @@ function openForm({ mode, tx, loanType: lt0, cpId, accountId } = {}) {
       </form>`;
     const root = $('#sheetBody');
     $$('[data-close]', root).forEach(b => b.onclick = closeSheet);
-    const grab = () => { // 保留使用者已填的值
-      const g = id => $('#' + id, root);
+    const g = id => $('#' + id, root);
+    const grab = () => {
       st.amount = g('famt')?.value ?? st.amount; st.when = g('fwhen')?.value || st.when; st.memo = g('fmemo')?.value ?? st.memo;
-      if (g('fcat')) st.cat = +g('fcat').value; if (g('facc')) st.acc = +g('facc').value;
+      if (g('fcat')) st.cat = g('fcat').value === '__new' ? '__new' : +g('fcat').value; if (g('facc')) st.acc = +g('facc').value;
+      if (g('fcatn')) { st.newCat = g('fcatn').value; st.newCatP = +g('fcatp').value || null; }
       if (g('ffrom')) st.from = +g('ffrom').value; if (g('fto')) st.to = +g('fto').value || null;
       if (g('fmy')) st.my = +g('fmy').value; if (g('fdebt')) st.debt = +g('fdebt').value;
       if (g('fto_amt')) st.to_amount = g('fto_amt').value;
       if (g('fcp') && g('fcp').value && g('fcp').value !== '__new') st.cp = +g('fcp').value;
+      if (g('fdr')) st.dr = g('fdr').value; if (g('fcr')) st.cr = g('fcr').value;
+      if (g('finv')) st.inv = g('finv').value === '__new' ? '__new' : +g('finv').value;
+      if (g('fcash')) st.cash = +g('fcash').value; if (g('fnewinv')) st.newInv = g('fnewinv').value;
+      if (g('fqty')) st.qty = g('fqty').value; if (g('fprice')) st.price = g('fprice').value; if (g('ffee')) st.fee = g('ffee').value;
+      if (g('fcost')) st.cost = g('fcost').value;
     };
-    $$('[data-mode]', root).forEach(b => b.onclick = () => { grab(); st.mode = b.dataset.mode; st.cat = null; render(); });
+    const updInv = () => {
+      const box = g('invsum'); if (!box) return;
+      const c = calcInv(), cur = acct(+st.cash)?.currency || 'TWD';
+      if (g('fcost') && !st.costTouched) g('fcost').value = st.cost;
+      box.innerHTML = st.side === 'buy'
+        ? `<div style="display:flex;justify-content:space-between"><span>付款金額</span><span class="num">${money(c.total, cur)}</span></div><div class="hint">借 投資帳戶　貸 ${esc(acct(+st.cash)?.name || '')}</div>`
+        : `<div style="display:flex;justify-content:space-between"><span>實收金額</span><span class="num">${money(c.proceeds, cur)}</span></div>
+           <div style="display:flex;justify-content:space-between"><span>已實現損益</span><span class="num ${c.pl >= 0 ? 'inc' : 'exp'}">${c.pl == null ? '—' : money(c.pl, cur, true)}</span></div>
+           <div class="hint">借 ${esc(acct(+st.cash)?.name || '')} ${c.proceeds ? money(c.proceeds, cur) : ''}　貸 投資帳戶 ${isFinite(c.cost) ? money(c.cost, cur) : ''}　差額記為投資損益</div>`;
+    };
+    $$('[data-mode]', root).forEach(b => b.onclick = () => {
+      grab(); const to = b.dataset.mode;
+      if (to === 'journal' && st.mode !== 'journal') { // 把目前填的內容帶進分錄
+        if (st.mode === 'expense' && st.cat) { st.dr = 'c:' + st.cat; st.cr = 'a:' + st.acc; }
+        else if (st.mode === 'income' && st.cat) { st.dr = 'a:' + st.acc; st.cr = 'c:' + st.cat; }
+        else if (st.mode === 'transfer' && st.to) { st.dr = 'a:' + st.to; st.cr = 'a:' + st.from; }
+      }
+      if (to !== st.mode && (to === 'expense' || to === 'income')) st.cat = null;
+      st.mode = to; render();
+    });
     $$('[data-lt]', root).forEach(b => b.onclick = () => { grab(); st.lt = b.dataset.lt; render(); });
-    ['facc', 'ffrom', 'fto', 'fmy', 'fdebt'].forEach(id => { const el = $('#' + id, root); if (el) el.onchange = () => { grab(); render(); }; });
-    const cpSel = $('#fcp', root);
-    if (cpSel) { const s = () => $('#fcpnw', root).hidden = cpSel.value !== '__new'; cpSel.addEventListener('change', s); s(); }
-    if (!tx) setTimeout(() => $('#famt', root)?.focus(), 220);
-    const del = $('#fdel', root);
+    $$('[data-side]', root).forEach(b => b.onclick = () => { grab(); st.side = b.dataset.side; st.costTouched = false; st.cost = ''; render(); });
+    ['facc', 'ffrom', 'fto', 'fmy', 'fdebt', 'fdr', 'fcr', 'finv', 'fcash'].forEach(id => { const el = g(id); if (el) el.onchange = () => { grab(); if (id === 'finv') { st.costTouched = false; st.cost = ''; } render(); }; });
+    ['fqty', 'fprice', 'ffee'].forEach(id => { const el = g(id); if (el) el.oninput = () => { grab(); updInv(); }; });
+    if (g('fcost')) g('fcost').oninput = () => { grab(); st.costTouched = true; updInv(); };
+    updInv();
+    const cpSel = g('fcp');
+    if (cpSel) { const s = () => g('fcpnw').hidden = cpSel.value !== '__new'; cpSel.addEventListener('change', s); s(); }
+    if (g('fcat')) g('fcat').onchange = () => { g('fcatnw').hidden = g('fcat').value !== '__new'; if (g('fcat').value === '__new') g('fcatn').focus(); };
+    if (!tx) setTimeout(() => (g('famt') || g('fqty'))?.focus(), 220);
+    const del = g('fdel');
     if (del) del.onclick = async () => {
       if (!del.dataset.armed) { del.dataset.armed = 1; del.textContent = '再按一次刪除'; setTimeout(() => { if (del.isConnected) { delete del.dataset.armed; del.textContent = '刪除'; } }, 3000); return; }
       const { error } = await sb.from('transactions').delete().eq('id', tx.id);
       if (error) return fail(error); closeSheet(); toast('已刪除'); await reloadAll();
     };
-    $('#txf', root).onsubmit = async e => {
+    g('txf').onsubmit = async e => {
       e.preventDefault(); grab();
-      const err = m => { $('#ferr', root).textContent = m; };
-      const amt = parseFloat(String(st.amount).replace(/,/g, ''));
-      if (!(amt > 0) && st.mode !== 'other') return err('請輸入大於 0 的金額。');
-      if (st.mode === 'other' && !isFinite(amt)) return err('請輸入金額。');
+      const err = m => { g('ferr').textContent = m; };
+      const amt = num(st.amount);
       const when = new Date(st.when); if (isNaN(when)) return err('時間格式不對。');
       const row = { occurred_at: when.toISOString(), memo: st.memo.trim() || null };
-      const toAmt = st.to_amount === '' ? null : parseFloat(String(st.to_amount).replace(/,/g, ''));
+      if (showAmt && st.mode !== 'other' && !(amt > 0)) return err('請輸入大於 0 的金額。');
+      if (st.mode === 'other' && showAmt && !isFinite(amt)) return err('請輸入金額。');
+      const toAmt = st.to_amount === '' ? null : num(st.to_amount);
       try {
         if (st.mode === 'expense' || st.mode === 'income') {
           if (!st.cat) return err('請選分類。');
+          if (st.cat === '__new') st.cat = await createCategory(st.mode, st.newCat, st.newCatP);
           Object.assign(row, { kind: st.mode, account_id: +st.acc, to_account_id: null, to_amount: null, amount: amt, category_id: +st.cat });
-          row.counterparty_id = isDebt(acct(+st.acc)) && cpSel ? (cpSel.value ? await resolvePerson(cpSel.value, $('#fcpn', root)?.value) : null) : null;
+          row.counterparty_id = isDebt(acct(+st.acc)) && cpSel ? (cpSel.value ? await resolvePerson(cpSel.value, g('fcpn')?.value) : null) : null;
         } else if (st.mode === 'transfer') {
           if (!st.to) return err('請選轉入帳戶。'); if (+st.from === +st.to) return err('轉出和轉入不能是同一個帳戶。');
           const diff = acct(+st.from).currency !== acct(+st.to).currency;
           if (diff && !(toAmt > 0)) return err('兩個帳戶幣別不同，請填轉入金額。');
           Object.assign(row, { kind: 'transfer', account_id: +st.from, to_account_id: +st.to, amount: amt, to_amount: diff ? toAmt : amt, category_id: null });
-          if (!tx) row.counterparty_id = null;
+        } else if (st.mode === 'journal') {
+          const m = mapJournal(st.dr, st.cr, amt); if (m.err) return err(m.err);
+          Object.assign(row, { to_account_id: null, to_amount: null, counterparty_id: null }, m.row);
+        } else if (st.mode === 'invest') {
+          const q = num(st.qty), pr = num(st.price), f = num(st.fee) || 0, c = calcInv();
+          if (!(q > 0)) return err('請輸入股數。'); if (!(pr >= 0) || !isFinite(pr)) return err('請輸入成交價。'); if (f < 0) return err('手續費不能是負數。');
+          let invAcct = st.inv === '__new' ? null : acct(+st.inv); const cash = acct(+st.cash);
+          if (!cash) return err('請選資金帳戶。');
+          if (!invAcct) {
+            const name = (st.newInv || '').trim(); if (!name) return err('請輸入新投資帳戶的名稱。');
+            if (st.side === 'sell') return err('新帳戶還沒有持股，不能賣出。');
+            const r = await sb.from('accounts').insert({ ledger_id: S.ledger.id, name, account_type: 'stock', nature: 'asset', currency: cash.currency, sort_order: nextSort(groupAccts(groupTypes('stock'))) }).select().single();
+            if (r.error) throw r.error; invAcct = r.data; S.accts.push(invAcct); S.acctMap.set(invAcct.id, invAcct); st.inv = invAcct.id;
+          }
+          if (invAcct.currency !== cash.currency) return err(`投資帳戶是 ${invAcct.currency}，資金帳戶是 ${cash.currency}，請選同幣別的帳戶。`);
+          const base = { kind: 'transfer', category_id: null, counterparty_id: null, quantity: q, unit_price: pr, fee: f || null, trade_side: st.side };
+          if (st.side === 'buy') Object.assign(row, base, { account_id: cash.id, to_account_id: invAcct.id, amount: c.total, to_amount: c.total });
+          else {
+            const p = S.pos.get(invAcct.id), own = tx?.trade_side === 'sell' ? (+tx.quantity || 0) : 0;
+            if (p && p.shares != null && q > p.shares + own + 1e-9) return err(`賣出股數超過目前持有的 ${qf.format(p.shares + own)} 股。`);
+            if (!(c.cost >= 0)) return err('請填賣出部分的成本。');
+            if (c.proceeds < 0) return err('費用比成交金額還高，請檢查數字。');
+            Object.assign(row, base, { account_id: invAcct.id, to_account_id: cash.id, amount: c.cost, to_amount: c.proceeds });
+          }
         } else if (st.mode === 'loan') {
           const L = LOAN[st.lt];
           if (!cpSel.value) return err('請選擇借貸對象。');
           if (!st.debt) return err(`帳本裡還沒有${L.debt === 'receivable' ? '應收' : '應付'}款項帳戶。`);
-          const cp = await resolvePerson(cpSel.value, $('#fcpn', root)?.value);
+          const cp = await resolvePerson(cpSel.value, g('fcpn')?.value);
           const M = acct(+st.my), D = acct(+st.debt), diff = M.currency !== D.currency;
           if (diff && !(toAmt > 0)) return err('兩個帳戶幣別不同，請填換算後金額。');
           const debtAmt = diff ? toAmt : amt;
           Object.assign(row, { kind: 'transfer', category_id: null, counterparty_id: cp },
             L.dir === 'out' ? { account_id: M.id, to_account_id: D.id, amount: amt, to_amount: debtAmt }
                             : { account_id: D.id, to_account_id: M.id, amount: debtAmt, to_amount: amt });
-        } else {
+        } else if (showAmt) {
           Object.assign(row, { amount: amt });
         }
+        if (st.mode !== 'invest' && st.mode !== 'other') Object.assign(row, { quantity: null, unit_price: null, fee: null, trade_side: null });
         const r = tx ? await sb.from('transactions').update(row).eq('id', tx.id) : await sb.from('transactions').insert({ ...row, ledger_id: S.ledger.id });
         if (r.error) throw r.error;
-        const last = LS.get('last', {}); if (st.mode === 'loan') last.loan = +st.my; else if (st.mode === 'transfer') last.transfer = +st.from; else if (st.mode !== 'other') last[st.mode] = +st.acc; LS.set('last', last);
-        closeSheet(); toast(tx ? '已更新' : '已記下'); await reloadAll();
+        const last = LS.get('last', {});
+        if (st.mode === 'loan') last.loan = +st.my; else if (st.mode === 'transfer') last.transfer = +st.from; else if (st.mode === 'invest') last.invest = +st.cash;
+        else if (st.mode === 'expense' || st.mode === 'income') last[st.mode] = +st.acc;
+        LS.set('last', last);
+        closeSheet(); toast(tx ? '已更新' : st.mode === 'invest' && st.side === 'sell' ? `已記下，損益 ${money(calcInv().pl, acct(+st.cash)?.currency, true)}` : '已記下'); await reloadAll();
       } catch (er) { err(er.message || String(er)); }
     };
   };
@@ -778,6 +1478,16 @@ function openForm({ mode, tx, loanType: lt0, cpId, accountId } = {}) {
 
 /* ---------- boot ---------- */
 let booted = null;
+function startDemo(empty = false) { DEMO = true; sb = makeDemo(empty === true); booted = null; S.ledger = null; onSession(sb.session); }
+function exitDemo() { DEMO = false; sb = real; booted = null; S.user = null; renderLogin(); }
+async function reachable() {
+  if (!real) return false;
+  try {
+    const c = new AbortController(), t = setTimeout(() => c.abort(), 5000);
+    const r = await fetch(SB_URL + '/auth/v1/health', { headers: { apikey: SB_KEY }, signal: c.signal });
+    clearTimeout(t); return r.status < 500;
+  } catch { return false; }
+}
 async function onSession(session) {
   if (!session) { S.user = null; booted = null; renderLogin(); return; }
   if (booted === session.user.id) return;
@@ -786,8 +1496,15 @@ async function onSession(session) {
   try { await ensureLedger(); LS.set('ledger', S.ledger.id); await loadRef(); renderShell(); }
   catch (e) { fail(e); $('#app').innerHTML = `<div class="login"><h1>載入失敗</h1><p>${esc(e.message || e)}</p><button class="btn" onclick="location.reload()">重試</button></div>`; }
 }
-sb.auth.onAuthStateChange((_ev, session) => { setTimeout(() => onSession(session), 0); });
-sb.auth.getSession().then(({ data }) => onSession(data.session));
+(async function boot() {
+  if (location.hash === '#demo') return startDemo(false);
+  if (location.hash === '#demo-empty') return startDemo(true);
+  OFFLINE = !(await reachable());
+  if (OFFLINE) return renderLogin();
+  real.auth.onAuthStateChange((_ev, session) => { if (!DEMO) setTimeout(() => onSession(session), 0); });
+  const { data } = await real.auth.getSession();
+  if (!DEMO) onSession(data.session);
+})();
 </script>
 </body>
 </html>
