@@ -65,7 +65,8 @@ nav.tabs .fab span{font-size:24px;line-height:1}
 .summary .num{font-size:18px;overflow-wrap:anywhere}
 .extra{font-size:12px;color:var(--muted);margin-top:8px}
 .search{display:flex;gap:8px}
-.search input{flex:1;min-width:0;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:9px 12px}
+.search input{flex:1;min-width:0;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:9px 12px;font-size:16px}
+.search .btn{flex:none}
 .daygroup{display:flex;flex-direction:column}
 .dayhead{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);padding:6px 4px}
 .list{background:var(--surface);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
@@ -830,15 +831,19 @@ async function viewFlow() {
     ${fresh ? `<div class="card"><strong>第一次使用？</strong><p class="hint" style="margin:4px 0 12px">先把每個帳戶現在有多少錢、信用卡欠多少填進來，之後的餘額和淨資產才會準。沒有的帳戶可以先新增。</p>
       <div class="two"><button class="btn" id="startRec">盤點帳戶餘額</button><button class="btn ghost" id="startAdd">＋ 新增帳戶</button></div></div>` : ''}
     <div class="seg" role="group"><button type="button" data-fm="month" aria-pressed="${!rangeMode}">按月</button><button type="button" data-fm="range" aria-pressed="${rangeMode}">選擇區間</button></div>
-    <div class="search"><input id="q" type="search" placeholder="${rangeMode ? '在這個區間搜尋備註' : '搜尋備註（全部時間）'}" value="${esc(S.q)}" aria-label="搜尋備註"></div>
+    <form class="search" id="qf" role="search"><input id="q" type="search" enterkeyhint="search" placeholder="${rangeMode ? '在這個區間搜尋備註' : '搜尋備註（全部時間）'}" value="${esc(S.q)}" aria-label="搜尋備註">
+      ${S.q ? '<button type="button" class="btn small ghost" id="qclear">清除</button>' : ''}<button type="submit" class="btn small">搜尋</button></form>
     ${S.q && !rangeMode ? '' : `<div class="card">${rangeMode ? rangeBar('fl', S.fr) : `<div class="monthbar"><button id="prev" aria-label="上個月">‹</button><strong>${label}</strong><button id="next" aria-label="下個月">›</button></div>`}
       <div class="summary" id="sum" style="margin-top:${rangeMode ? '12px' : '0'}"><div><small>支出</small><span class="num exp">…</span></div><div><small>收入</small><span class="num inc">…</span></div><div><small>結餘</small><span class="num">…</span></div></div><div class="extra" id="sumx"></div></div>`}
     <div id="days"><div class="spinner">載入中…</div></div>`;
   $$('[data-fm]', v).forEach(b => b.onclick = () => { S.fm = b.dataset.fm; LS.set('flowMode', S.fm); S.flowShow = 300; viewFlow(); });
   if (rangeMode && $('#flpre')) bindRangeBar(v, 'fl', S.fr, () => { LS.set('flowRange', S.fr); S.flowShow = 300; viewFlow(); });
   if (fresh) { $('#startRec').onclick = () => reconcile(); $('#startAdd').onclick = () => editAccount(null); }
-  const q = $('#q'); let timer;
-  q.oninput = () => { clearTimeout(timer); timer = setTimeout(() => { S.q = q.value.trim(); viewFlow().then(() => { const n = $('#q'); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }); }, 400); };
+  // 打完字按 Enter 或「搜尋」才查詢，輸入中不會一直重新整理畫面
+  const q = $('#q');
+  $('#qf').onsubmit = e => { e.preventDefault(); const val = q.value.trim(); q.blur(); if (val === S.q) return; S.q = val; S.flowShow = 300; viewFlow(); };
+  q.oninput = () => { if (!q.value && S.q) { S.q = ''; S.flowShow = 300; viewFlow(); } };
+  const qc = $('#qclear'); if (qc) qc.onclick = () => { S.q = ''; S.flowShow = 300; viewFlow(); };
   if (!S.q && !rangeMode) { $('#prev').onclick = () => { S.month = addMonths(S.month, -1); viewFlow(); }; $('#next').onclick = () => { S.month = addMonths(S.month, 1); viewFlow(); }; }
   let txs;
   if (S.q && !rangeMode) {
@@ -1211,7 +1216,7 @@ async function openAccount(id) {
     ${isInv(a) ? `<div class="actions4" style="grid-template-columns:repeat(3,1fr);margin-bottom:12px"><button data-trade="buy">買進</button><button data-trade="sell">賣出</button><button data-trade="seed">補登股數</button></div>` : ''}
     <div class="card" style="box-shadow:none;background:var(--bg);padding:12px;display:flex;flex-direction:column;gap:10px;margin-bottom:12px">
       <div id="ahrange"></div>
-      <input id="ahq" type="search" placeholder="搜尋這個帳戶的備註" aria-label="搜尋備註" style="border:1px solid var(--line);border-radius:10px;padding:9px 12px;background:var(--surface);font-size:16px"></div>
+      <form class="search" id="ahqf" role="search"><input id="ahq" type="search" enterkeyhint="search" placeholder="搜尋這個帳戶的備註" aria-label="搜尋備註"><button type="submit" class="btn small">搜尋</button></form></div>
     <div id="acctTx"><div class="spinner">載入中…</div></div>`, async root => {
     $$('[data-trade]', root).forEach(b => b.onclick = () => b.dataset.trade === 'seed' ? seedShares(id) : openForm({ mode: 'invest', side: b.dataset.trade, invId: id }));
     $('#aedit', root).onclick = () => editAccount(id);
@@ -1241,7 +1246,8 @@ async function openAccount(id) {
       for (const t of r.data) { const d = deltaFor(t, id); if (d > 0) inflow += d; else outflow -= d; }
       draw();
     };
-    let timer; qEl.oninput = () => { clearTimeout(timer); timer = setTimeout(() => { F.q = qEl.value.trim(); load(true); }, 400); };
+    $('#ahqf', root).onsubmit = e => { e.preventDefault(); const val = qEl.value.trim(); qEl.blur(); if (val === F.q) return; F.q = val; load(true); };
+    qEl.oninput = () => { if (!qEl.value && F.q) { F.q = ''; load(true); } };
     drawRange(); load(true);
   });
 }
