@@ -161,6 +161,9 @@ body.sorting{user-select:none;-webkit-user-select:none;cursor:grabbing}
 .rangedates{display:flex;align-items:center;gap:6px;flex:1;min-width:0}
 .rangedates input{flex:1;min-width:0;border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--surface);font-size:15px;min-height:42px}
 @media (max-width:420px){.rangedates{flex-basis:100%}}
+.splittoggle{font-size:14px;color:var(--ink)}
+.splitcard{box-shadow:none;background:var(--bg);padding:12px;display:flex;flex-direction:column;gap:10px}
+.splitcard select,.splitcard input{background:var(--surface)}
 .recrow{gap:12px;cursor:text}
 .recrow input{flex:none;width:9.5em;max-width:45%;border:1px solid var(--line);border-radius:9px;padding:8px 10px;background:var(--bg);text-align:right}
 .addsub{color:var(--accent);font-size:13.5px;padding:10px 14px 10px 32px}
@@ -355,7 +358,7 @@ function makeDemo(empty = false) {
           if (this.t === 'counterparties' && table.some(c => c.name === r.name)) return { data: null, error: { code: '23505', message: '已經有同名的對象' } };
           r.id = Math.max(0, ...table.map(x => x.id)) + 1;
           if (this.t === 'counterparties') Object.assign(r, { hidden: false, memo: r.memo ?? null, sort_order: null });
-          if (this.t === 'transactions') for (const k of ['counterparty_id', 'to_account_id', 'to_amount', 'category_id', 'quantity', 'unit_price', 'fee', 'tax', 'trade_side', 'memo']) r[k] ??= null;
+          if (this.t === 'transactions') for (const k of ['counterparty_id', 'to_account_id', 'to_amount', 'category_id', 'quantity', 'unit_price', 'fee', 'tax', 'trade_side', 'memo', 'split_id', 'split_total']) r[k] ??= null;
           if (this.t === 'accounts') Object.assign(r, { hidden: false, memo: r.memo ?? null, sort_order: r.sort_order ?? null });
           if (this.t === 'categories') Object.assign(r, { hidden: false, parent_id: r.parent_id ?? null });
           table.push(r);
@@ -419,7 +422,7 @@ async function fetchAll(build) { // 分頁取回超過 1000 筆
 const S = { user: null, ledger: null, accts: [], acctMap: new Map(), bal: new Map(), cats: [], catMap: new Map(),
             cps: [], cpMap: new Map(), cpBal: [], month: som(new Date()), view: LS.get('view', 'flow'), q: '',
             showZero: LS.get('showZero', false), sel: new Set() };
-const TX_COLS = 'id,kind,occurred_at,account_id,to_account_id,amount,to_amount,category_id,memo,counterparty_id,quantity,unit_price,fee,tax,trade_side';
+const TX_COLS = 'id,kind,occurred_at,account_id,to_account_id,amount,to_amount,category_id,memo,counterparty_id,quantity,unit_price,fee,tax,trade_side,split_id,split_total';
 const INV_TYPES = ['stock', 'fund', 'investment'];
 const isInv = a => a && INV_TYPES.includes(a.account_type);
 const qf = new Intl.NumberFormat('zh-TW', { maximumFractionDigits: 4 });
@@ -752,6 +755,7 @@ function txRow(t, { showDate = false, selectable = false, accountId = null, pers
   } else {
     title = t.kind === 'opening_balance' ? '期初餘額' : '餘額調整'; cls = 'tr'; dot = t.kind === 'opening_balance' ? '初' : '調';
   }
+  if (t.split_id) title += ' · 分攤';
   const sub = `借 ${J.dr}　貸 ${J.cr}`;
   if (accountId != null) { const dl = deltaFor(t, accountId); amount = Math.abs(dl); cur = acct(accountId)?.currency; sign = dl < 0 ? '−' : dl > 0 ? '+' : ''; }
   if (person) { const pd = personDelta(t)[0]; if (pd) { amount = Math.abs(pd[1]); cur = pd[0]; sign = pd[1] > 0 ? '+' : '−'; } }
@@ -1343,12 +1347,16 @@ async function openPerson(id) {
     <div class="form">
       <div>${bal.length ? bal.map(([cur, b]) => `<div><small class="muted">${b > 0 ? '對方欠我' : '我欠對方'}</small><div class="num bigtotal ${b > 0 ? 'inc' : 'exp'}">${money(Math.abs(b), cur)}</div></div>`).join('') : '<div class="muted">已結清</div>'}
         ${c.memo ? `<p class="hint">${esc(c.memo)}</p>` : ''}</div>
+      ${bal.length ? `<button class="btn" id="psettle">結算 ${bal.map(([cur, b]) => money(Math.abs(b), cur)).join('、')}（${bal[0][1] > 0 ? '對方付我' : '我付對方'}）</button>` : ''}
       <div class="actions4">${Object.entries(LOAN).map(([k, L]) => `<button data-loan="${k}">${L.label}</button>`).join('')}</div>
       <div id="pTx"><div class="spinner">載入中…</div></div>
       <button class="btn ghost" id="pedit">改名／隱藏</button>
     </div>`, async root => {
     $$('[data-loan]', root).forEach(b => b.onclick = () => openForm({ mode: 'loan', loanType: b.dataset.loan, cpId: id }));
     $('#pedit', root).onclick = () => editPerson(id);
+    const ps = $('#psettle', root);
+    if (ps) ps.onclick = () => { const [cur, b] = bal.find(([c]) => c === 'TWD') || bal[0];
+      openForm({ mode: 'loan', loanType: b > 0 ? 'collect' : 'repay', cpId: id, amount: String(Math.round(Math.abs(b) * 100) / 100), memo: '結算' }); };
     const r = await sb.from('transactions').select(TX_COLS).eq('ledger_id', S.ledger.id).eq('counterparty_id', id).order('occurred_at', { ascending: false }).limit(500);
     if (r.error) return fail(r.error);
     const box = $('#pTx', root);
@@ -1755,11 +1763,11 @@ function mapJournal(dr, cr, amt) {
   return { err: '借方和貸方至少要有一邊是帳戶。' };
 }
 
-function openForm({ mode, tx, loanType: lt0, cpId, accountId, side, invId, invLink, cat, memo } = {}) {
-  const st = { mode: mode || (!tx && S.prefs?.tab) || 'expense', amount: '', to_amount: '', when: toLocalInput(new Date()).slice(0, 10), time: toLocalInput(new Date()).slice(11), memo: memo || '', cat: cat ?? null, invLink: invLink ?? null, fromTotal: false, acc: null, from: null, to: null,
+function openForm({ mode, tx, loanType: lt0, cpId, accountId, side, invId, invLink, cat, memo, amount: amt0 } = {}) {
+  const st = { mode: mode || (!tx && S.prefs?.tab) || 'expense', amount: amt0 || '', to_amount: '', when: toLocalInput(new Date()).slice(0, 10), time: toLocalInput(new Date()).slice(11), memo: memo || '', cat: cat ?? null, invLink: invLink ?? null, fromTotal: false, acc: null, from: null, to: null,
                lt: lt0 || 'lend', cp: cpId ?? null, my: null, debt: null, dr: '', cr: '',
                side: side || 'buy', inv: invId ?? null, cash: null, qty: '', price: '', fee: '', tax: '', total: '', cost: '', newInv: '',
-               feeTouched: false, taxTouched: false, totalTouched: false, costTouched: false, stock: '', dayPL: 'gain', method: LS.get('costMethod', 'fifo'), hold: null };
+               feeTouched: false, taxTouched: false, totalTouched: false, costTouched: false, stock: '', dayPL: 'gain', split: false, splitPayer: 'me', splitShare: 'half', mine: '', splitCp: null, method: LS.get('costMethod', 'fifo'), hold: null };
   if (tx) {
     const A = acct(tx.account_id), B = acct(tx.to_account_id), lt = loanType(tx);
     const lts = toLocalInput(new Date(tx.occurred_at));
@@ -1830,6 +1838,25 @@ function openForm({ mode, tx, loanType: lt0, cpId, accountId, side, invId, invLi
   };
   let drawHold = () => {}, updInv = () => {};
 
+  // 分攤：金額填整筆帳單；我付→我的份額記支出、對方份額記借出；對方付→我的份額記為對方代付（應付款項）
+  const splitCalc = () => { const total = num(st.amount) || 0, mine = st.splitShare === 'half' ? Math.round(total / 2 * 100) / 100 : num(st.mine); return { total, mine, other: isFinite(mine) ? Math.round((total - mine) * 100) / 100 : NaN }; };
+  const splitBlock = () => `<label class="toggle splittoggle"><input type="checkbox" id="fsplit" ${st.split ? 'checked' : ''}> 和別人分攤這筆</label>
+    ${st.split ? `<div class="card splitcard">
+      <div class="field"><label for="fscp">和誰分攤</label><select id="fscp">${cpOptions(st.splitCp)}</select></div>
+      <div class="field" id="fscpnw" ${st.splitCp === '__new' ? '' : 'hidden'}><label for="fscpn">新對象名字</label><input id="fscpn" value="${esc(st.splitNew || '')}"></div>
+      <div class="field"><label>誰付的錢</label><div class="seg" role="group"><button type="button" data-payer="me" aria-pressed="${st.splitPayer === 'me'}">我先付</button><button type="button" data-payer="them" aria-pressed="${st.splitPayer === 'them'}">對方先付</button></div></div>
+      <div class="field"><label>我的份額</label><div class="seg" role="group"><button type="button" data-share="half" aria-pressed="${st.splitShare === 'half'}">各半</button><button type="button" data-share="custom" aria-pressed="${st.splitShare === 'custom'}">自訂金額</button></div></div>
+      ${st.splitShare === 'custom' ? `<div class="field"><label for="fmine">我負擔的金額</label><input id="fmine" class="num" inputmode="decimal" value="${esc(st.mine)}" placeholder="0"></div>` : ''}
+      <div id="splitsum" class="hint"></div></div>` : ''}`;
+  const drawSplit = root => {
+    const el = $('#splitsum', root); if (!el) return;
+    const { total, mine, other } = splitCalc(), cpName = st.splitCp && st.splitCp !== '__new' ? S.cpMap.get(+st.splitCp)?.name : (st.splitNew || '對方');
+    if (!total) { el.textContent = '先在上面填整筆帳單金額。'; return; }
+    if (!isFinite(mine) || mine < 0 || mine > total) { el.textContent = '我負擔的金額要介於 0 和帳單金額之間。'; return; }
+    el.innerHTML = st.splitPayer === 'me'
+      ? `會記成：支出 <strong class="num">${money(mine)}</strong>（我的份額）＋ 借出給 ${esc(cpName)} <strong class="num">${money(other)}</strong>，都從付款帳戶扣。`
+      : `會記成：支出 <strong class="num">${money(mine)}</strong>，由 ${esc(cpName)} 代付（記到應付款項）。${esc(cpName)} 的份額 ${money(other)} 不用記。`;
+  };
   const defBtn = (k, cur) => !cur || +cur === prefAcct(k) ? (cur && +cur === prefAcct(k) ? '<span class="defmark">預設</span>' : '') : `<button type="button" class="linkbtn defbtn" data-def="${k}" data-cur="${cur}">設為預設</button>`;
   const render = () => {
     const tabs = [['expense', '支出'], ['income', '收入'], ['transfer', '轉帳'], ['invest', '投資'], ['loan', '借貸'], ['journal', '分錄']];
@@ -1842,7 +1869,9 @@ function openForm({ mode, tx, loanType: lt0, cpId, accountId, side, invId, invLi
         <div class="field"><label for="facc">${st.mode === 'income' ? '入帳帳戶' : '帳戶'} ${defBtn(st.mode === 'income' && st.invLink ? 'dividend' : st.mode, st.acc)}</label><select id="facc">${acctOptions(() => true, +st.acc)}</select></div>
         ${st.mode === 'income' && (st.invLink || S.catMap.get(+st.cat)?.is_investment) ? `<div class="field"><label for="flink">來自哪一檔投資（選填）</label><select id="flink"><option value="">（不指定）</option>${acctOptions(isInv, +st.invLink)}</select>
           <span class="hint">指定後，這筆會算進該檔的股利和投資收支報表，錢仍然記在入帳帳戶。</span></div>` : ''}
-        ${isDebt(a) ? `<div class="field"><label for="fcp">借貸對象（${st.mode === 'expense' ? '誰代付' : '誰'}）</label><select id="fcp">${cpOptions(st.cp)}</select></div><div class="field" id="fcpnw" hidden><label for="fcpn">新對象名字</label><input id="fcpn"></div>` : ''}`;
+        ${isDebt(a) && !st.split ? `<div class="field"><label for="fcp">借貸對象（${st.mode === 'expense' ? '誰代付' : '誰'}）</label><select id="fcp">${cpOptions(st.cp)}</select></div><div class="field" id="fcpnw" hidden><label for="fcpn">新對象名字</label><input id="fcpn"></div>` : ''}
+        ${st.mode === 'expense' ? splitBlock() : ''}`;
+      if (st.mode === 'expense' && st.split && st.splitPayer === 'them') body = body.replace(/<div class="field"><label for="facc">[\s\S]*?<\/select><\/div>/, '');
     } else if (st.mode === 'transfer') {
       const A = acct(+st.from), B = acct(+st.to);
       body = `<div class="two"><div class="field"><label for="ffrom">從（貸方） ${defBtn('transferFrom', st.from)}</label><select id="ffrom">${acctOptions(() => true, +st.from)}</select></div>
@@ -1928,6 +1957,7 @@ function openForm({ mode, tx, loanType: lt0, cpId, accountId, side, invId, invLi
       if (g('finv')) st.inv = g('finv').value === '__new' ? '__new' : +g('finv').value;
       if (g('fcash')) st.cash = +g('fcash').value; if (g('fnewinv')) st.newInv = g('fnewinv').value;
       if (g('fdayamt')) st.amount = g('fdayamt').value; if (g('fstock')) st.stock = g('fstock').value;
+      if (g('fscp')) { st.splitCp = g('fscp').value === '__new' ? '__new' : (+g('fscp').value || null); } if (g('fscpn')) st.splitNew = g('fscpn').value; if (g('fmine')) st.mine = g('fmine').value;
       if (g('fqty')) st.qty = g('fqty').value; if (g('fprice')) st.price = g('fprice').value; if (g('ffee')) st.fee = g('ffee').value;
       if (g('ftax')) st.tax = g('ftax').value; if (g('ftotal')) st.total = g('ftotal').value;
       if (g('fcost')) st.cost = g('fcost').value;
@@ -1969,6 +1999,13 @@ function openForm({ mode, tx, loanType: lt0, cpId, accountId, side, invId, invLi
     const tb = g('toBuy');
     if (tb) tb.onclick = () => { grab(); Object.assign(st, { mode: 'invest', side: 'buy', inv: +st.to, cash: +st.from, total: String(num(st.amount) || ''), totalTouched: true, fee: '', feeTouched: true, price: '', qty: '', fromTotal: true, hold: null }); render(); setTimeout(() => g('fqty')?.focus(), 50); };
     $$('[data-side]', root).forEach(b => b.onclick = () => { grab(); st.side = b.dataset.side; Object.assign(st, { costTouched: false, cost: '', totalTouched: false, taxTouched: false, tax: '' }); render(); });
+    const sp = g('fsplit');
+    if (sp) sp.onchange = () => { grab(); st.split = sp.checked; if (st.split && !st.splitCp) { const lastCp = LS.get('splitCp', null); st.splitCp = lastCp && S.cpMap.has(lastCp) ? lastCp : null; } render(); };
+    $$('[data-payer]', root).forEach(b => b.onclick = () => { grab(); st.splitPayer = b.dataset.payer; render(); });
+    $$('[data-share]', root).forEach(b => b.onclick = () => { grab(); st.splitShare = b.dataset.share; if (st.splitShare === 'custom' && !st.mine) { const c = splitCalc(); st.mine = c.total ? String(Math.round(c.total / 2 * 100) / 100) : ''; } render(); });
+    if (g('fscp')) g('fscp').onchange = () => { grab(); g('fscpnw').hidden = st.splitCp !== '__new'; drawSplit(root); };
+    ['famt', 'fmine', 'fscpn'].forEach(id => { const el = g(id); if (el && st.split) el.addEventListener('input', () => { grab(); drawSplit(root); }); });
+    drawSplit(root);
     $$('[data-pl]', root).forEach(b => b.onclick = () => { grab(); st.dayPL = b.dataset.pl; render(); });
     $$('[data-method]', root).forEach(b => b.onclick = () => { grab(); st.method = b.dataset.method; LS.set('costMethod', st.method); st.costTouched = false; render(); });
     $$('[data-reset]', root).forEach(b => b.onclick = () => { grab(); st[b.dataset.reset + 'Touched'] = false; updInv(); });
@@ -1983,8 +2020,8 @@ function openForm({ mode, tx, loanType: lt0, cpId, accountId, side, invId, invLi
     if (!tx) setTimeout(() => (g('famt') || g('fdayamt') || g('fqty'))?.focus(), 220);
     const del = g('fdel');
     if (del) del.onclick = async () => {
-      if (!del.dataset.armed) { del.dataset.armed = 1; del.textContent = '再按一次刪除'; setTimeout(() => { if (del.isConnected) { delete del.dataset.armed; del.textContent = '刪除'; } }, 3000); return; }
-      const { error } = await sb.from('transactions').delete().eq('id', tx.id);
+      if (!del.dataset.armed) { del.dataset.armed = 1; del.textContent = tx.split_id ? '再按一次刪除整組分攤' : '再按一次刪除'; setTimeout(() => { if (del.isConnected) { delete del.dataset.armed; del.textContent = '刪除'; } }, 3000); return; }
+      const { error } = tx.split_id ? await sb.from('transactions').delete().eq('split_id', tx.split_id) : await sb.from('transactions').delete().eq('id', tx.id);
       if (error) return fail(error); await reloadAll(); closeSheet(); toast('已刪除');
     };
     g('txf').onsubmit = async e => {
@@ -1998,7 +2035,32 @@ function openForm({ mode, tx, loanType: lt0, cpId, accountId, side, invId, invLi
       if (st.mode === 'other' && showAmt && !isFinite(amt)) return err('請輸入金額。');
       const toAmt = st.to_amount === '' ? null : num(st.to_amount);
       try {
-        if (st.mode === 'expense' || st.mode === 'income') {
+        if (st.mode === 'expense' && st.split) {
+          if (!st.cat) return err('請選分類。');
+          const { total, mine, other } = splitCalc();
+          if (!(mine >= 0) || mine > total) return err('我負擔的金額要介於 0 和帳單金額之間。');
+          if (!st.splitCp) return err('請選擇和誰分攤。');
+          if (st.cat === '__new') st.cat = await createCategory(st.mode, st.newCat, st.newCatP);
+          const cp = await resolvePerson(st.splitCp === '__new' ? '__new' : String(st.splitCp), st.splitNew);
+          const sid = tx?.split_id || newId(), base = { ledger_id: S.ledger.id, occurred_at: row.occurred_at, split_id: sid, quantity: null, unit_price: null, fee: null, tax: null, trade_side: null };
+          const cname = catLabel(+st.cat), rows = [];
+          if (st.splitPayer === 'me') {
+            const A = acct(+st.acc); if (!A || isDebt(A)) return err('請選你付款的帳戶。');
+            const recv = defaultDebt('receivable', A.currency); if (!recv) return err('帳本裡還沒有應收款項帳戶，請先到帳戶頁新增。');
+            if (mine > 0) rows.push({ ...base, kind: 'expense', account_id: A.id, to_account_id: null, to_amount: null, amount: mine, category_id: +st.cat, counterparty_id: null, memo: row.memo, split_total: total });
+            if (other > 0) rows.push({ ...base, kind: 'transfer', account_id: A.id, to_account_id: recv, amount: other, to_amount: other, category_id: null, counterparty_id: cp, memo: row.memo || `${cname} 分攤`, split_total: mine > 0 ? null : total });
+          } else {
+            const pay = defaultDebt('payable', 'TWD'); if (!pay) return err('帳本裡還沒有應付款項帳戶，請先到帳戶頁新增。');
+            if (!(mine > 0)) return err('對方先付、我也沒有份額的話，就不用記這筆。');
+            rows.push({ ...base, kind: 'expense', account_id: pay, to_account_id: null, to_amount: null, amount: mine, category_id: +st.cat, counterparty_id: cp, memo: row.memo, split_total: total });
+          }
+          if (tx) { const d = tx.split_id ? await sb.from('transactions').delete().eq('split_id', tx.split_id) : await sb.from('transactions').delete().eq('id', tx.id); if (d.error) throw d.error; }
+          const ins = await sb.from('transactions').insert(rows); if (ins.error) throw ins.error;
+          LS.set('splitCp', cp);
+          if (st.splitPayer === 'me') { const last = LS.get('last', {}); last.expense = +st.acc; LS.set('last', last); }
+          await reloadAll(); closeSheet(); toast(tx ? '已更新分攤' : `已記下：我的份額 ${money(mine)}${st.splitPayer === 'me' && other > 0 ? `、${S.cpMap.get(cp)?.name || '對方'} 欠 ${money(other)}` : ''}`);
+          return;
+        } else if (st.mode === 'expense' || st.mode === 'income') {
           if (!st.cat) return err('請選分類。');
           if (st.cat === '__new') st.cat = await createCategory(st.mode, st.newCat, st.newCatP);
           Object.assign(row, { kind: st.mode, account_id: +st.acc, to_account_id: st.mode === 'income' && st.invLink ? +st.invLink : null, to_amount: null, amount: amt, category_id: +st.cat });
@@ -2053,7 +2115,11 @@ function openForm({ mode, tx, loanType: lt0, cpId, accountId, side, invId, invLi
           Object.assign(row, { amount: amt });
         }
         if ((st.mode !== 'invest' || st.side === 'day') && st.mode !== 'other') Object.assign(row, { quantity: null, unit_price: null, fee: null, tax: null, trade_side: null });
-        const r = tx ? await sb.from('transactions').update(row).eq('id', tx.id) : await sb.from('transactions').insert({ ...row, ledger_id: S.ledger.id });
+        let r;
+        if (tx?.split_id) {   // 原本是分攤，改成一般紀錄：整組換成這一筆
+          const d = await sb.from('transactions').delete().eq('split_id', tx.split_id); if (d.error) throw d.error;
+          r = await sb.from('transactions').insert({ ...row, ledger_id: S.ledger.id, split_id: null, split_total: null });
+        } else r = tx ? await sb.from('transactions').update(row).eq('id', tx.id) : await sb.from('transactions').insert({ ...row, ledger_id: S.ledger.id });
         if (r.error) throw r.error;
         const last = LS.get('last', {});
         if (st.mode === 'loan') last.loan = +st.my; else if (st.mode === 'transfer') last.transfer = +st.from; else if (st.mode === 'invest') last.invest = +st.cash;
@@ -2066,8 +2132,23 @@ function openForm({ mode, tx, loanType: lt0, cpId, accountId, side, invId, invLi
     };
   };
   sheetEnter(null);
-  render();
+  if (tx?.split_id) {
+    $('#sheetBody').innerHTML = '<div class="spinner">讀取分攤紀錄…</div>';
+    sb.from('transactions').select(TX_COLS).eq('ledger_id', S.ledger.id).eq('split_id', tx.split_id).then(({ data, error }) => {
+      if (error) return fail(error);
+      const exp = data.find(t => t.kind === 'expense'), loan = data.find(t => t.kind === 'transfer');
+      const ref = exp || loan, payerThem = !!exp && isPay(acct(exp.account_id));
+      const mine = exp ? +exp.amount : 0, total = +(ref.split_total ?? (mine + (loan ? +loan.amount : 0)));
+      const lts2 = toLocalInput(new Date(ref.occurred_at));
+      Object.assign(st, { mode: 'expense', split: true, splitPayer: payerThem ? 'them' : 'me', amount: String(total), cat: exp?.category_id ?? st.cat,
+        acc: payerThem ? st.acc : (exp || loan).account_id, splitCp: (payerThem ? exp.counterparty_id : loan?.counterparty_id) ?? null,
+        splitShare: Math.abs(mine * 2 - total) < 0.01 ? 'half' : 'custom', mine: String(mine), when: lts2.slice(0, 10), time: lts2.slice(11), memo: exp?.memo || '' });
+      if (!st.cat) st.cat = catTops('expense')[0]?.id;
+      render();
+    });
+  } else render();
 }
+const newId = () => (crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 3 | 8)).toString(16); }));
 
 /* ---------- boot ---------- */
 let booted = null;
