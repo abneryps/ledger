@@ -171,7 +171,7 @@ body.sorting{user-select:none;-webkit-user-select:none;cursor:grabbing}
 /* sheet */
 #sheet{position:fixed;inset:0;z-index:20;background:rgba(10,14,22,.45);display:flex;align-items:flex-end;justify-content:center;opacity:0;transition:opacity .18s}
 #sheet.open{opacity:1}
-#sheet .panel{background:var(--surface);width:100%;max-width:640px;max-height:92%;overflow:auto;border-radius:18px 18px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom,0px));transform:translateY(24px);transition:transform .2s}
+#sheet .panel{background:var(--surface);width:100%;max-width:640px;max-height:92%;overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;border-radius:18px 18px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom,0px));transform:translateY(24px);transition:transform .2s}
 #sheet.open .panel{transform:none}
 .sheethead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
 .sheethead h2{font-size:18px;margin:0}
@@ -203,6 +203,9 @@ input[type="date"]::-webkit-datetime-edit,input[type="datetime-local"]::-webkit-
 .spinner{padding:40px;text-align:center;color:var(--muted)}
 svg text{fill:var(--muted);font-size:11px;font-family:var(--f-body)}
 @media (prefers-reduced-motion:reduce){#sheet,#sheet .panel{transition:none}}
+/* 彈出視窗開著時，後面的頁面不能捲動（用事件攔截，不改 overflow，避免頁面跳回頂端） */
+#sheet{overscroll-behavior:contain}
+.tblwrap,[style*="overflow-x:auto"]{overscroll-behavior-x:contain}
 </style>
 </head>
 <body>
@@ -702,6 +705,34 @@ function closeAllSheets() {
   const s = $('#sheet'); s.classList.remove('open'); setTimeout(() => { if (!SH.open) { s.hidden = true; $('#sheetBody').innerHTML = ''; } }, 180);
 }
 $('#sheet').addEventListener('click', e => { if (e.target.id === 'sheet') closeSheet(); });
+(() => {
+  const sheet = $('#sheet'); let y0 = 0, x0 = 0;
+  const hScroller = t => t.closest('.tblwrap, [style*="overflow-x:auto"]');
+  // 判斷這次捲動會不會「穿透」到後面的頁面：在背景上、視窗沒東西可捲、或已經到頂／到底
+  const leaks = (target, dy) => {
+    const panel = target.closest('.panel'); if (!panel) return true;
+    const max = panel.scrollHeight - panel.clientHeight;
+    if (max <= 1) return true;
+    return (dy < 0 && panel.scrollTop <= 0) || (dy > 0 && panel.scrollTop >= max - 1);
+  };
+  sheet.addEventListener('wheel', e => { const hs = hScroller(e.target); if (hs && hs.scrollWidth > hs.clientWidth + 1 && Math.abs(e.deltaX) > Math.abs(e.deltaY)) return; if (leaks(e.target, e.deltaY)) e.preventDefault(); }, { passive: false });
+  sheet.addEventListener('touchstart', e => { y0 = e.touches[0].clientY; x0 = e.touches[0].clientX; }, { passive: true });
+  sheet.addEventListener('touchmove', e => {
+    const dy = y0 - e.touches[0].clientY, dx = x0 - e.touches[0].clientX;   // 手指往上推 = 內容往下捲
+    // 只有「左右滑」而且表格真的比畫面寬時才放行；上下滑一律照視窗規則判斷
+    const hs = e.target.closest('.panel') && hScroller(e.target);
+    if (hs && hs.scrollWidth > hs.clientWidth + 1 && Math.abs(dx) > Math.abs(dy)) return;
+    if (leaks(e.target, dy)) e.preventDefault();
+  }, { passive: false });
+  // 方向鍵／空白鍵捲動也只作用在視窗內
+  document.addEventListener('keydown', e => {
+    if (!SH.open || !['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', ' ', 'Home', 'End'].includes(e.key)) return;
+    if (e.target.closest('input, textarea, select, button, a, summary, label, [contenteditable]')) return;
+    const panel = $('#sheet .panel'); e.preventDefault();
+    const step = { ArrowDown: 60, ArrowUp: -60, PageDown: panel.clientHeight * .9, ' ': panel.clientHeight * .9, PageUp: -panel.clientHeight * .9, Home: -1e9, End: 1e9 }[e.key];
+    panel.scrollTop += step;
+  });
+})();
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#sheet').hidden) closeSheet(); });
 
 /* ---------- transaction row ---------- */
@@ -821,10 +852,25 @@ function bindRangeBar(root, p, R, onChange) {
 }
 
 /* ---------- 流水 ---------- */
+// 分類篩選：選大分類時連同底下的子分類一起
+function flowCatIds(v) {
+  if (!v) return null;
+  const [k, id] = v.split(':'), n = +id;
+  if (!S.catMap.has(n)) return null;
+  return k === 'p' ? [n, ...catKids(n).map(c => c.id)] : [n];
+}
+function flowCatOptions(sel) {
+  const grp = (kind, label) => `<optgroup label="${label}">${catTops(kind).filter(p => !p.hidden).map(p => {
+    const kids = catKids(p.id).filter(c => !c.hidden);
+    return `<option value="p:${p.id}" ${sel === 'p:' + p.id ? 'selected' : ''}>${esc(p.name)}${kids.length ? '（全部）' : ''}</option>` + kids.map(c => `<option value="c:${c.id}" ${sel === 'c:' + c.id ? 'selected' : ''}>　${esc(p.name)} › ${esc(c.name)}</option>`).join('');
+  }).join('')}</optgroup>`;
+  return `<option value="">全部分類</option>${grp('expense', '支出分類')}${grp('income', '收入分類')}`;
+}
 async function viewFlow() {
   const v = $('#view'), L = S.ledger.id, m = S.month;
   const label = `${m.getFullYear()} 年 ${m.getMonth() + 1} 月`;
-  S.fm ??= LS.get('flowMode', 'month'); S.fr ??= LS.get('flowRange', { pre: '3m' }); S.flowShow ??= 300;
+  S.fm ??= LS.get('flowMode', 'month'); S.fr ??= LS.get('flowRange', { pre: '3m' }); S.flowShow ??= 300; S.fc ??= LS.get('flowCat', '');
+  const catIds = flowCatIds(S.fc);
   const rangeMode = S.fm === 'range';
   const fresh = S.accts.every(a => Math.abs(S.bal.get(a.id) || 0) < 0.005);
   v.innerHTML = `
@@ -833,6 +879,7 @@ async function viewFlow() {
     <div class="seg" role="group"><button type="button" data-fm="month" aria-pressed="${!rangeMode}">按月</button><button type="button" data-fm="range" aria-pressed="${rangeMode}">選擇區間</button></div>
     <form class="search" id="qf" role="search"><input id="q" type="search" enterkeyhint="search" placeholder="${rangeMode ? '在這個區間搜尋備註' : '搜尋備註（全部時間）'}" value="${esc(S.q)}" aria-label="搜尋備註">
       ${S.q ? '<button type="button" class="btn small ghost" id="qclear">清除</button>' : ''}<button type="submit" class="btn small">搜尋</button></form>
+    <div class="rangebar"><select id="fcat" aria-label="分類篩選" style="flex:1;min-width:0">${flowCatOptions(S.fc)}</select>${S.fc ? '<button type="button" class="btn small ghost" id="fcatclear">全部分類</button>' : ''}</div>
     ${S.q && !rangeMode ? '' : `<div class="card">${rangeMode ? rangeBar('fl', S.fr) : `<div class="monthbar"><button id="prev" aria-label="上個月">‹</button><strong>${label}</strong><button id="next" aria-label="下個月">›</button></div>`}
       <div class="summary" id="sum" style="margin-top:${rangeMode ? '12px' : '0'}"><div><small>支出</small><span class="num exp">…</span></div><div><small>收入</small><span class="num inc">…</span></div><div><small>結餘</small><span class="num">…</span></div></div><div class="extra" id="sumx"></div></div>`}
     <div id="days"><div class="spinner">載入中…</div></div>`;
@@ -840,6 +887,8 @@ async function viewFlow() {
   if (rangeMode && $('#flpre')) bindRangeBar(v, 'fl', S.fr, () => { LS.set('flowRange', S.fr); S.flowShow = 300; viewFlow(); });
   if (fresh) { $('#startRec').onclick = () => reconcile(); $('#startAdd').onclick = () => editAccount(null); }
   // 打完字按 Enter 或「搜尋」才查詢，輸入中不會一直重新整理畫面
+  const fc = $('#fcat'); fc.onchange = () => { S.fc = fc.value; LS.set('flowCat', S.fc); S.flowShow = 300; viewFlow(); };
+  const fcc = $('#fcatclear'); if (fcc) fcc.onclick = () => { S.fc = ''; LS.set('flowCat', ''); S.flowShow = 300; viewFlow(); };
   const q = $('#q');
   $('#qf').onsubmit = e => { e.preventDefault(); const val = q.value.trim(); q.blur(); if (val === S.q) return; S.q = val; S.flowShow = 300; viewFlow(); };
   q.oninput = () => { if (!q.value && S.q) { S.q = ''; S.flowShow = 300; viewFlow(); } };
@@ -847,13 +896,15 @@ async function viewFlow() {
   if (!S.q && !rangeMode) { $('#prev').onclick = () => { S.month = addMonths(S.month, -1); viewFlow(); }; $('#next').onclick = () => { S.month = addMonths(S.month, 1); viewFlow(); }; }
   let txs;
   if (S.q && !rangeMode) {
-    const r = await sb.from('transactions').select(TX_COLS).eq('ledger_id', L).ilike('memo', `%${S.q}%`).order('occurred_at', { ascending: false }).limit(300);
+    let rq = sb.from('transactions').select(TX_COLS).eq('ledger_id', L).ilike('memo', `%${S.q}%`); if (catIds) rq = rq.in('category_id', catIds);
+    const r = await rq.order('occurred_at', { ascending: false }).limit(300);
     if (r.error) throw r.error; txs = r.data;
   } else {
     txs = await fetchAll(() => {
       let q = sb.from('transactions').select(TX_COLS).eq('ledger_id', L);
       q = rangeMode ? applyRange(q, S.fr) : q.gte('occurred_at', m.toISOString()).lt('occurred_at', addMonths(m, 1).toISOString());
       if (S.q) q = q.ilike('memo', `%${S.q}%`);
+      if (catIds) q = q.in('category_id', catIds);
       return q.order('occurred_at', { ascending: false }).order('id', { ascending: false });
     });
     if (!$('#sum')) return;
@@ -869,7 +920,7 @@ async function viewFlow() {
   }
   const box = $('#days');
   if (!box) return;
-  if (!txs.length) { box.innerHTML = `<div class="card empty">${S.q ? '找不到符合的紀錄。' : rangeMode ? '這段期間沒有紀錄。' : '這個月還沒有紀錄。按下方「記一筆」開始。'}</div>`; return; }
+  if (!txs.length) { box.innerHTML = `<div class="card empty">${S.q || S.fc ? '找不到符合的紀錄。' : rangeMode ? '這段期間沒有紀錄。' : '這個月還沒有紀錄。按下方「記一筆」開始。'}</div>`; return; }
   const showYear = S.q || (rangeMode && new Date(txs[0].occurred_at).getFullYear() !== new Date(txs[txs.length - 1].occurred_at).getFullYear());
   const draw = () => {
     const shown = txs.slice(0, S.flowShow), groups = new Map();
@@ -1216,21 +1267,32 @@ async function openAccount(id) {
     ${isInv(a) ? `<div class="actions4" style="grid-template-columns:repeat(3,1fr);margin-bottom:12px"><button data-trade="buy">買進</button><button data-trade="sell">賣出</button><button data-trade="seed">補登股數</button></div>` : ''}
     <div class="card" style="box-shadow:none;background:var(--bg);padding:12px;display:flex;flex-direction:column;gap:10px;margin-bottom:12px">
       <div id="ahrange"></div>
+      ${isDebt(a) ? `<p class="hint" style="margin:0">要按人看餘額、期間淨額或結算，請到 <button type="button" class="linkbtn" id="ahtocp">借貸對象 ›</button></p>` : ''}
       <form class="search" id="ahqf" role="search"><input id="ahq" type="search" enterkeyhint="search" placeholder="搜尋這個帳戶的備註" aria-label="搜尋備註"><button type="submit" class="btn small">搜尋</button></form></div>
     <div id="acctTx"><div class="spinner">載入中…</div></div>`, async root => {
     $$('[data-trade]', root).forEach(b => b.onclick = () => b.dataset.trade === 'seed' ? seedShares(id) : openForm({ mode: 'invest', side: b.dataset.trade, invId: id }));
     $('#aedit', root).onclick = () => editAccount(id);
     // 歷史查詢：區間 + 備註搜尋，每次載入 200 筆，可以一直往前載入
     S.ah ??= {}; const F = S.ah[id] ??= { R: { pre: 'all' }, q: '' }, PAGE = 200;
-    let rows = [], total = 0, seq = 0, inflow = 0, outflow = 0;
+    let rows = [], total = 0, seq = 0, sums = null;
+    const sumHtml = () => `${F.R.pre === 'all' ? '全部' : '這段期間'}流入 <span class="num inc">${money(sums.inflow, a.currency)}</span>・流出 <span class="num exp">${money(sums.outflow, a.currency)}</span>・淨額 <span class="num">${money(sums.inflow - sums.outflow, a.currency, true)}</span>`;
+    // 合計要涵蓋整個篩選範圍（不只已載入的 200 筆）
+    const loadSums = async my => {
+      const all = await fetchAll(() => { let q = sb.from('transactions').select('id,kind,account_id,to_account_id,amount,to_amount').eq('ledger_id', S.ledger.id).or(`account_id.eq.${id},to_account_id.eq.${id}`);
+        q = applyRange(q, F.R); if (F.q) q = q.ilike('memo', `%${F.q}%`); return q.order('id'); });
+      if (my !== seq) return;
+      sums = { inflow: 0, outflow: 0 }; for (const t of all) { const d = deltaFor(t, id); if (d > 0) sums.inflow += d; else sums.outflow -= d; }
+      const el = $('#ahsum', root); if (el) el.innerHTML = sumHtml();
+    };
     const box = $('#acctTx', root), qEl = $('#ahq', root); qEl.value = F.q;
     const drawRange = () => { $('#ahrange', root).innerHTML = rangeBar('ah', F.R); bindRangeBar(root, 'ah', F.R, () => { drawRange(); load(true); }); };
     const build = () => { let q = sb.from('transactions').select(TX_COLS, { count: 'exact' }).eq('ledger_id', S.ledger.id).or(`account_id.eq.${id},to_account_id.eq.${id}`);
-      q = applyRange(q, F.R); if (F.q) q = q.ilike('memo', `%${F.q}%`); return q.order('occurred_at', { ascending: false }).order('id', { ascending: false }); };
+      q = applyRange(q, F.R); if (F.q) q = q.ilike('memo', `%${F.q}%`);
+      return q.order('occurred_at', { ascending: false }).order('id', { ascending: false }); };
     const draw = () => {
       if (!rows.length) { box.innerHTML = `<div class="empty">${F.q || F.R.pre !== 'all' ? '這個條件下沒有紀錄。' : '沒有紀錄。'}</div>`; return; }
       box.innerHTML = `<div class="hint" style="margin:0 4px 8px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><span>共 ${total} 筆${rows.length < total ? `，已載入 ${rows.length} 筆` : ''}</span>
-          <span>已載入的流入 <span class="num inc">${money(inflow, a.currency)}</span>・流出 <span class="num exp">${money(outflow, a.currency)}</span></span></div>
+          <span id="ahsum">${sums ? sumHtml() : '計算合計…'}</span></div>
         <div class="list">${rows.map(t => txRow(t, { showDate: true, accountId: id })).join('')}</div>
         ${rows.length < total ? `<button class="btn ghost" id="ahmore" style="width:100%;margin-top:10px">載入更早的 ${Math.min(PAGE, total - rows.length)} 筆</button>` : rows.length > PAGE ? '<p class="hint" style="text-align:center">已經是最早的紀錄。</p>' : ''}`;
       bindRows(box, rows);
@@ -1238,16 +1300,16 @@ async function openAccount(id) {
     };
     const load = async reset => {
       const my = ++seq;
-      if (reset) { rows = []; inflow = outflow = 0; box.innerHTML = '<div class="spinner">載入中…</div>'; }
+      if (reset) { rows = []; sums = null; box.innerHTML = '<div class="spinner">載入中…</div>'; loadSums(my).catch(fail); }
       const r = await build().range(rows.length, rows.length + PAGE - 1);
       if (my !== seq || !box.isConnected) return;
       if (r.error) return fail(r.error);
       total = r.count ?? r.data.length; rows = rows.concat(r.data);
-      for (const t of r.data) { const d = deltaFor(t, id); if (d > 0) inflow += d; else outflow -= d; }
       draw();
     };
     $('#ahqf', root).onsubmit = e => { e.preventDefault(); const val = qEl.value.trim(); qEl.blur(); if (val === F.q) return; F.q = val; load(true); };
     qEl.oninput = () => { if (!qEl.value && F.q) { F.q = ''; load(true); } };
+    const tc = $('#ahtocp', root); if (tc) tc.onclick = () => { closeAllSheets(); go('loans'); };
     drawRange(); load(true);
   });
 }
@@ -1345,29 +1407,84 @@ function editPerson(id) {
     };
   });
 }
+function cpPeriodParts(txs) {
+  const per = {}; for (const t of txs) for (const [cur, v] of personDelta(t)) per[cur] = (per[cur] || 0) + v;
+  const br = { lent: 0, theyPaid: 0, back: 0, iPaid: 0 };
+  for (const t of txs) { const A = acct(t.account_id), B = acct(t.to_account_id), v = Math.abs(personDelta(t).find(([c]) => c === 'TWD')?.[1] || 0);
+    if (t.kind === 'transfer' && isRec(B)) br.lent += v; else if (t.kind === 'transfer' && isRec(A)) br.back += v;
+    else if (isPay(A)) br.theyPaid += v; else if (t.kind === 'transfer' && isPay(B)) br.iPaid += v; }
+  return { nz: Object.entries(per).filter(([, v]) => Math.abs(v) >= 0.005),
+    parts: [['我先付／借出', br.lent], ['對方先付／借入', br.theyPaid], ['對方還我', br.back], ['我還對方', br.iPaid]].filter(([, v]) => v >= 0.005) };
+}
+const oweTxt = (cur, b, net) => `${b > 0 ? (net ? '對方應付我' : '對方欠我') : (net ? '我應付對方' : '我欠對方')} <span class="num ${b > 0 ? 'inc' : 'exp'}">${money(Math.abs(b), cur)}</span>`;
 async function openPerson(id) {
   asPage('cp' + id, () => openPerson(id));
   const c = S.cpMap.get(id); const m = cpSummary().get(id) || {};
   const bal = Object.entries(m).filter(([, b]) => Math.abs(b) >= 0.005);
+  S.pr ??= {}; const R = S.pr[id] ??= { pre: 'all' };
+  const owe = (cur, b) => `${b > 0 ? '對方淨欠我' : '我淨欠對方'} <span class="num ${b > 0 ? 'inc' : 'exp'}">${money(Math.abs(b), cur)}</span>`;
   openSheet(`<div class="sheethead"><h2>${esc(c.name)}</h2><button class="iconbtn" data-close aria-label="關閉">✕</button></div>
     <div class="form">
-      <div>${bal.length ? bal.map(([cur, b]) => `<div><small class="muted">${b > 0 ? '對方欠我' : '我欠對方'}</small><div class="num bigtotal ${b > 0 ? 'inc' : 'exp'}">${money(Math.abs(b), cur)}</div></div>`).join('') : '<div class="muted">已結清</div>'}
+      <div><small class="muted">目前總餘額（全部時間）</small>${bal.length ? bal.map(([cur, b]) => `<div><small class="muted">${b > 0 ? '對方欠我' : '我欠對方'}</small><div class="num bigtotal ${b > 0 ? 'inc' : 'exp'}">${money(Math.abs(b), cur)}</div></div>`).join('') : '<div class="muted">已結清</div>'}
         ${c.memo ? `<p class="hint">${esc(c.memo)}</p>` : ''}</div>
-      ${bal.length ? `<button class="btn" id="psettle">結算 ${bal.map(([cur, b]) => money(Math.abs(b), cur)).join('、')}（${bal[0][1] > 0 ? '對方付我' : '我付對方'}）</button>` : ''}
+      <div class="card" style="box-shadow:none;background:var(--bg);padding:12px;display:flex;flex-direction:column;gap:8px">
+        <div id="prange"></div><div id="pperiod" style="margin:0"></div></div>
+      <div id="psettle" style="display:flex;flex-direction:column;gap:8px"></div>
       <div class="actions4">${Object.entries(LOAN).map(([k, L]) => `<button data-loan="${k}">${L.label}</button>`).join('')}</div>
       <div id="pTx"><div class="spinner">載入中…</div></div>
       <button class="btn ghost" id="pedit">改名／隱藏</button>
     </div>`, async root => {
     $$('[data-loan]', root).forEach(b => b.onclick = () => openForm({ mode: 'loan', loanType: b.dataset.loan, cpId: id }));
     $('#pedit', root).onclick = () => editPerson(id);
-    const ps = $('#psettle', root);
-    if (ps) ps.onclick = () => { const [cur, b] = bal.find(([c]) => c === 'TWD') || bal[0];
-      openForm({ mode: 'loan', loanType: b > 0 ? 'collect' : 'repay', cpId: id, amount: String(Math.round(Math.abs(b) * 100) / 100), memo: '結算' }); };
-    const r = await sb.from('transactions').select(TX_COLS).eq('ledger_id', S.ledger.id).eq('counterparty_id', id).order('occurred_at', { ascending: false }).limit(500);
-    if (r.error) return fail(r.error);
-    const box = $('#pTx', root);
-    box.innerHTML = r.data.length ? `<div class="list">${r.data.map(t => txRow(t, { showDate: true, person: true })).join('')}</div>` : '<div class="empty">還沒有紀錄。</div>';
-    bindRows(box, r.data);
+    const settle = (b, memo, date) => openForm({ mode: 'loan', loanType: b > 0 ? 'collect' : 'repay', cpId: id, amount: String(Math.round(Math.abs(b) * 100) / 100), memo, date });
+    const box = $('#pTx', root); let seq = 0;
+    const drawRange = () => { $('#prange', root).innerHTML = rangeBar('pr', R); bindRangeBar(root, 'pr', R, () => { drawRange(); load(); }); };
+    const load = async () => {
+      const my = ++seq; box.innerHTML = '<div class="spinner">載入中…</div>';
+      let allTx;
+      try { allTx = await fetchAll(() => sb.from('transactions').select(TX_COLS).eq('ledger_id', S.ledger.id).eq('counterparty_id', id).order('occurred_at', { ascending: false }).order('id', { ascending: false })); }
+      catch (e) { return fail(e); }
+      if (my !== seq || !box.isConnected) return;
+      const [from, to] = rangeOf(R), all = R.pre === 'all';
+      const inR = t => { const d = new Date(t.occurred_at); return (!from || d >= from) && (!to || d < to); };
+      const txs = allTx.filter(inR);
+      // 收還款＝把錢付清（對方還我、我還對方）；其他都是新發生的代墊／借款
+      const isSettle = t => t.kind === 'transfer' && (isRec(acct(t.account_id)) || isPay(acct(t.to_account_id)));
+      const tw = t => personDelta(t).filter(([c]) => c === 'TWD').reduce((s, [, v]) => s + v, 0);
+      const sum = list => list.reduce((s, t) => s + tw(t), 0), r2 = x => Math.round(x * 100) / 100;
+      const open = r2(sum(allTx.filter(t => from && new Date(t.occurred_at) < from)));
+      const newTx = txs.filter(t => !isSettle(t)), setTx = txs.filter(isSettle);
+      const lent = r2(newTx.filter(t => tw(t) > 0).reduce((s, t) => s + tw(t), 0)), theyPaid = r2(-newTx.filter(t => tw(t) < 0).reduce((s, t) => s + tw(t), 0));
+      const back = r2(-setTx.filter(t => tw(t) < 0).reduce((s, t) => s + tw(t), 0)), iPaid = r2(setTx.filter(t => tw(t) > 0).reduce((s, t) => s + tw(t), 0));
+      const close = r2(open + lent - theyPaid - back + iPaid);
+      const dir = v => Math.abs(v) < 0.005 ? '<span class="muted">0（已結清）</span>' : `${v > 0 ? '對方欠我' : '我欠對方'} <span class="num ${v > 0 ? 'inc' : 'exp'}">${money(Math.abs(v))}</span>`;
+      const row = (k, v, cls = '') => `<div class="st-r ${cls}"><span>${k}</span><span>${v}</span></div>`;
+      const other = Object.entries(cpSummary().get(id) || {}).filter(([c, b]) => c !== 'TWD' && Math.abs(b) >= 0.005);
+      $('#pperiod', root).innerHTML = all ? `共 ${txs.length} 筆` : `<div class="stmt">
+          ${row('上期結餘', dir(open))}
+          ${row('本期代墊／借款', `<span class="num">${money(r2(lent - theyPaid), 'TWD', true)}</span>`)}
+          ${lent ? row('我先付／借出', `<span class="num">${money(lent)}</span>`, 'st-sub') : ''}${theyPaid ? row('對方先付／借入', `<span class="num">${money(theyPaid)}</span>`, 'st-sub') : ''}
+          ${row('本期收還款', `<span class="num">${money(r2(iPaid - back), 'TWD', true)}</span>`)}
+          ${back ? row('對方還我', `<span class="num">${money(back)}</span>`, 'st-sub') : ''}${iPaid ? row('我還對方', `<span class="num">${money(iPaid)}</span>`, 'st-sub') : ''}
+          <div class="st-net"><span>期末餘額</span><span>${dir(close)}</span></div></div>
+          <p class="hint" style="margin:6px 0 0">＋ 表示對方欠我變多、− 表示變少。期末餘額 ＝ 上期結餘 ＋ 本期代墊 ＋ 本期收還款，月結就結這個數字。${other.length ? ' 外幣另計：' + other.map(([c, b]) => money(b, c, true)).join('、') : ''}</p>`;
+      const ps = $('#psettle', root), btns = [];
+      if (!all && Math.abs(close) >= 0.005) {
+        const endDay = to && to <= new Date() ? ymd(addDays(to, -1)) : null;   // 已過完的期間記在最後一天，下期的「上期結餘」才會是 0
+        btns.push([`結算期末餘額 ${money(Math.abs(close))}（${close > 0 ? '對方付我' : '我付對方'}）`, () => settle(close, `結算 ${rangeLabel(R)}`, endDay), '']);
+      }
+      if (bal.length && (all || !to || to > new Date())) { const [cur, b] = bal.find(([c]) => c === 'TWD') || bal[0];
+        if (all || Math.abs(b - close) >= 0.005) btns.push([`結算目前全部 ${money(Math.abs(b), cur)}（${b > 0 ? '對方付我' : '我付對方'}）`, () => settle(b, '結算'), btns.length ? 'ghost' : '']); }
+      ps.innerHTML = btns.map(([t, , cls], i) => `<button class="btn ${cls}" data-st="${i}">${t}</button>`).join('');
+      $$('[data-st]', ps).forEach(b => b.onclick = btns[+b.dataset.st][1]);
+      const list = l => `<div class="list">${l.map(t => txRow(t, { showDate: true, person: true })).join('')}</div>`;
+      box.innerHTML = !txs.length ? `<div class="empty">${all ? '還沒有紀錄。' : '這段期間沒有紀錄。'}</div>`
+        : all ? list(txs)
+        : `${newTx.length ? `<div class="sectionhead"><h2>本期代墊／借款（${newTx.length}）</h2></div>${list(newTx)}` : ''}
+           ${setTx.length ? `<div class="sectionhead" style="margin-top:10px"><h2>本期收還款（${setTx.length}）</h2></div>${list(setTx)}` : ''}`;
+      bindRows(box, txs);
+    };
+    drawRange(); load();
   });
 }
 
@@ -1769,8 +1886,8 @@ function mapJournal(dr, cr, amt) {
   return { err: '借方和貸方至少要有一邊是帳戶。' };
 }
 
-function openForm({ mode, tx, loanType: lt0, cpId, accountId, side, invId, invLink, cat, memo, amount: amt0 } = {}) {
-  const st = { mode: mode || (!tx && S.prefs?.tab) || 'expense', amount: amt0 || '', to_amount: '', when: toLocalInput(new Date()).slice(0, 10), time: toLocalInput(new Date()).slice(11), memo: memo || '', cat: cat ?? null, invLink: invLink ?? null, fromTotal: false, acc: null, from: null, to: null,
+function openForm({ mode, tx, loanType: lt0, cpId, accountId, side, invId, invLink, cat, memo, amount: amt0, date: date0 } = {}) {
+  const st = { mode: mode || (!tx && S.prefs?.tab) || 'expense', amount: amt0 || '', to_amount: '', when: date0 || toLocalInput(new Date()).slice(0, 10), time: toLocalInput(new Date()).slice(11), memo: memo || '', cat: cat ?? null, invLink: invLink ?? null, fromTotal: false, acc: null, from: null, to: null,
                lt: lt0 || 'lend', cp: cpId ?? null, my: null, debt: null, dr: '', cr: '',
                side: side || 'buy', inv: invId ?? null, cash: null, qty: '', price: '', fee: '', tax: '', total: '', cost: '', newInv: '',
                feeTouched: false, taxTouched: false, totalTouched: false, costTouched: false, stock: '', dayPL: 'gain', split: false, splitPayer: 'me', splitShare: 'half', mine: '', splitCp: null, method: LS.get('costMethod', 'fifo'), hold: null };
