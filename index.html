@@ -521,7 +521,6 @@ function renderLogin(mode = 'in', msg = '') {
       ${mode === 'in' ? '<button class="linkbtn" type="button" id="forgot">忘記密碼？</button>' : '<p class="hint">註冊後若收到確認信，請先點信中的連結再回來登入。</p>'}
       <p class="hint" id="authMsg">${esc(msg)}</p>
     </form>
-    ${OFFLINE ? '' : '<button class="linkbtn" id="demo1" type="button" style="align-self:center">先用範例資料看看</button>'}
   </div>`;
   $$('.seg button').forEach(b => b.onclick = () => renderLogin(b.dataset.m));
   ['demo1', 'demo2'].forEach(id => { const b = $('#' + id); if (b) b.onclick = () => startDemo(false); });
