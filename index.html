@@ -863,6 +863,38 @@ function openRecurList() {
     $$('[data-r]', root).forEach(b => b.onclick = () => editRecur(+b.dataset.r));
   });
 }
+// 週期設定欄位（管理頁和記一筆共用）
+function recurSchedHtml(st) {
+  const f = st.freq;
+  return `<div class="field"><label for="rfq">週期</label><select id="rfq">${[['monthly', '每月'], ['weekly', '每週'], ['nmonths', '每 N 個月'], ['yearly', '每年']].map(([x, n]) => `<option value="${x}" ${f === x ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
+    ${f === 'weekly' ? `<div class="wdays">${[1, 2, 3, 4, 5, 6, 0].map(d => `<label><input type="checkbox" data-wd="${d}" ${st.days.includes(d) ? 'checked' : ''}> ${WK[d]}</label>`).join('')}</div>`
+      : `<div class="two">${f === 'yearly' ? `<div class="field"><label for="rmo">月份</label><select id="rmo">${Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}" ${st.month === i + 1 ? 'selected' : ''}>${i + 1} 月</option>`).join('')}</select></div>` : ''}
+        ${f === 'nmonths' ? `<div class="field"><label for="rev">每幾個月</label><input id="rev" type="number" min="1" max="24" inputmode="numeric" value="${st.every}"></div>` : ''}
+        <div class="field"><label for="rdays">${f === 'yearly' ? '日' : '每月幾號'}</label><input id="rdays" inputmode="numeric" value="${st.days.join(', ')}" placeholder="${f === 'yearly' ? '例如 15' : '例如 6, 16'}"></div></div>
+        ${f === 'yearly' ? '' : '<p class="hint" style="margin:-4px 0 0">一個月多次用逗號分開；填 31 遇到小月會用最後一天。</p>'}`}
+    <div class="two"><div class="field"><label for="rs">${f === 'nmonths' ? '開始日期（從這個月起算）' : '開始日期'}</label><input id="rs" type="date" value="${st.start_date}"></div>
+      <div class="field"><label for="re">結束日期 <small class="muted">選填</small></label><input id="re" type="date" value="${st.end_date || ''}"></div></div>`;
+}
+function recurSchedGrab(root, st) {
+  const g = x => $('#' + x, root);
+  if (g('rmo')) st.month = +g('rmo').value; if (g('rev')) st.every = +g('rev').value || 1;
+  if (g('rdays')) st.days = g('rdays').value.split(/[,，、\s]+/).filter(Boolean).map(Number);
+  if ($('[data-wd]', root)) st.days = $$('[data-wd]', root).filter(c => c.checked).map(c => +c.dataset.wd);
+  st.start_date = g('rs').value; st.end_date = g('re').value;
+}
+// 週期改變時，日期跟著換成合理的預設
+function recurFreqChange(st, nf2) {
+  if (nf2 === 'weekly') st.days = [new Date(st.start_date + 'T00:00').getDay() || 1]; else if (st.freq === 'weekly') st.days = [new Date(st.start_date + 'T00:00').getDate()];
+  st.freq = nf2;
+}
+function recurSchedCheck(st) {
+  if (!st.days.length) return st.freq === 'weekly' ? '請勾選星期幾。' : '請填日期。';
+  if (st.days.some(d => st.freq === 'weekly' ? !(d >= 0 && d <= 6) : !(Number.isInteger(d) && d >= 1 && d <= 31))) return '日期請填 1～31。';
+  if (!st.start_date) return '請選開始日期。'; if (st.end_date && st.end_date < st.start_date) return '結束日期要在開始日期之後。';
+  return null;
+}
+const recurSchedRow = st => ({ freq: st.freq, days: [...new Set(st.days)].sort((a, b) => a - b), month: st.freq === 'yearly' ? st.month : null,
+  every: st.freq === 'nmonths' ? Math.min(24, Math.max(1, st.every)) : 1, start_date: st.start_date, end_date: st.end_date || null });
 function editRecur(id) {
   const r0 = id ? S.recur.find(x => x.id === id) : null;
   const st = r0 ? { ...r0, days: [...r0.days] } : { name: '', kind: 'expense', account_id: null, to_account_id: null, category_id: null, amount: '', memo: '', freq: 'monthly', days: [new Date().getDate()], month: new Date().getMonth() + 1, every: 2, start_date: ymd(new Date()), end_date: '', active: true };
@@ -880,14 +912,7 @@ function editRecur(id) {
         ${k === 'expense' || k === 'income' ? `<div class="field"><label for="rcat">分類</label><select id="rcat">${catOptions(k, st.category_id)}</select></div>` : ''}
         ${k === 'transfer' ? `<div class="field"><label for="rto">轉入帳戶</label><select id="rto">${acctOptions(a => a.id !== st.account_id, st.to_account_id)}</select></div>` : ''}
         ${k === 'invest' ? `<div class="field"><label for="rto">投資標的（帳戶）</label><select id="rto">${acctOptions(isInv, st.to_account_id)}</select></div>` : ''}
-        <div class="field"><label for="rfq">週期</label><select id="rfq">${[['monthly', '每月'], ['weekly', '每週'], ['nmonths', '每 N 個月'], ['yearly', '每年']].map(([x, n]) => `<option value="${x}" ${f === x ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
-        ${f === 'weekly' ? `<div class="wdays">${[1, 2, 3, 4, 5, 6, 0].map(d => `<label><input type="checkbox" data-wd="${d}" ${st.days.includes(d) ? 'checked' : ''}> ${WK[d]}</label>`).join('')}</div>`
-          : `<div class="two">${f === 'yearly' ? `<div class="field"><label for="rmo">月份</label><select id="rmo">${Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}" ${st.month === i + 1 ? 'selected' : ''}>${i + 1} 月</option>`).join('')}</select></div>` : ''}
-            ${f === 'nmonths' ? `<div class="field"><label for="rev">每幾個月</label><input id="rev" type="number" min="1" max="24" inputmode="numeric" value="${st.every}"></div>` : ''}
-            <div class="field"><label for="rdays">${f === 'yearly' ? '日' : '每月幾號'}</label><input id="rdays" inputmode="numeric" value="${st.days.join(', ')}" placeholder="${f === 'yearly' ? '例如 15' : '例如 6, 16'}"></div></div>
-            ${f === 'yearly' ? '' : '<p class="hint" style="margin:-4px 0 0">一個月多次用逗號分開；填 31 遇到小月會用最後一天。</p>'}`}
-        <div class="two"><div class="field"><label for="rs">${f === 'nmonths' ? '開始日期（從這個月起算）' : '開始日期'}</label><input id="rs" type="date" value="${st.start_date}"></div>
-          <div class="field"><label for="re">結束日期 <small class="muted">選填</small></label><input id="re" type="date" value="${st.end_date || ''}"></div></div>
+        ${recurSchedHtml(st)}
         <div class="field"><label for="rm">備註 <small class="muted">記入時用，空白就用名稱</small></label><input id="rm" value="${esc(st.memo || '')}"></div>
         ${r0 ? `<label class="toggle"><input type="checkbox" id="rpause" ${st.active ? '' : 'checked'}> 暫停（不會再出現待確認）</label>` : ''}
         <p class="hint" id="rerr2" style="color:var(--inc)"></p>
@@ -897,16 +922,11 @@ function editRecur(id) {
       const grab = () => {
         st.name = g('rn').value; st.amount = g('ra').value; st.account_id = +g('racc').value || null; st.memo = g('rm').value;
         if (g('rcat')) st.category_id = +g('rcat').value || null; if (g('rto')) st.to_account_id = +g('rto').value || null;
-        if (g('rmo')) st.month = +g('rmo').value; if (g('rev')) st.every = +g('rev').value || 1;
-        if (g('rdays')) st.days = g('rdays').value.split(/[,，、\s]+/).filter(Boolean).map(Number);
-        if ($('[data-wd]', root)) st.days = $$('[data-wd]', root).filter(c => c.checked).map(c => +c.dataset.wd);
-        st.start_date = g('rs').value; st.end_date = g('re').value; if (g('rpause')) st.active = !g('rpause').checked;
+        recurSchedGrab(root, st); if (g('rpause')) st.active = !g('rpause').checked;
       };
       $$('[data-k]', root).forEach(b => b.onclick = () => { grab(); if (st.kind !== b.dataset.k) { st.kind = b.dataset.k; st.category_id = null; st.to_account_id = null; } render(); });
       g('racc').onchange = () => { grab(); if (st.kind === 'transfer') render(); };
-      g('rfq').onchange = () => { grab(); const nf2 = g('rfq').value;
-        if (nf2 === 'weekly') st.days = [new Date(st.start_date + 'T00:00').getDay() || 1]; else if (st.freq === 'weekly') st.days = [new Date(st.start_date + 'T00:00').getDate()];
-        st.freq = nf2; render(); };
+      g('rfq').onchange = () => { grab(); recurFreqChange(st, g('rfq').value); render(); };
       g('rf').onsubmit = async e => {
         e.preventDefault(); grab();
         const amt = parseFloat(String(st.amount).replace(/,/g, ''));
@@ -914,13 +934,9 @@ function editRecur(id) {
         if ((st.kind === 'expense' || st.kind === 'income') && !st.category_id) return err('請選分類。');
         if ((st.kind === 'transfer' || st.kind === 'invest') && !st.to_account_id) return err(st.kind === 'invest' ? '請選投資標的。' : '請選轉入帳戶。');
         if (st.to_account_id && acct(st.to_account_id).currency !== acct(st.account_id).currency) return err('兩個帳戶幣別不同，定期紀錄只支援同幣別。');
-        if (!st.days.length) return err(st.freq === 'weekly' ? '請勾選星期幾。' : '請填日期。');
-        if (st.days.some(d => st.freq === 'weekly' ? !(d >= 0 && d <= 6) : !(Number.isInteger(d) && d >= 1 && d <= 31))) return err('日期請填 1～31。');
-        if (!st.start_date) return err('請選開始日期。'); if (st.end_date && st.end_date < st.start_date) return err('結束日期要在開始日期之後。');
+        const se = recurSchedCheck(st); if (se) return err(se);
         const row = { name: st.name.trim(), kind: st.kind, account_id: st.account_id, to_account_id: st.kind === 'transfer' || st.kind === 'invest' ? st.to_account_id : null,
-          category_id: st.kind === 'expense' || st.kind === 'income' ? st.category_id : null, amount: amt, memo: st.memo.trim() || null, freq: st.freq,
-          days: [...new Set(st.days)].sort((a, b) => a - b), month: st.freq === 'yearly' ? st.month : null, every: st.freq === 'nmonths' ? Math.min(24, Math.max(1, st.every)) : 1,
-          start_date: st.start_date, end_date: st.end_date || null, active: st.active };
+          category_id: st.kind === 'expense' || st.kind === 'income' ? st.category_id : null, amount: amt, memo: st.memo.trim() || null, ...recurSchedRow(st), active: st.active };
         // 新規則：開始日期之前的不會跳出來；改了週期或開始日期就從今天之後重新計算
         if (!r0) row.done_until = st.start_date <= ymd(new Date()) ? ymd(addDays(new Date(st.start_date + 'T00:00'), -1)) : null;
         else if (r0.freq !== row.freq || r0.start_date !== row.start_date || String(r0.days) !== String(row.days) || r0.month !== row.month || r0.every !== row.every) { row.done_until = r0.done_until; row.handled = []; }
@@ -2382,6 +2398,13 @@ function openForm({ mode, tx, loanType: lt0, cpId, accountId, side, invId, invLi
       ? `會記成：支出 <strong class="num">${money(mine)}</strong>（我的份額）＋ 借出給 ${esc(cpName)} <strong class="num">${money(other)}</strong>，都從付款帳戶扣。`
       : `會記成：支出 <strong class="num">${money(mine)}</strong>，由 ${esc(cpName)} 代付（記到應付款項）。${esc(cpName)} 的份額 ${money(other)} 不用記。`;
   };
+  // 設為定期：支出、收入、轉帳、投資買進（分攤、借貸、分錄、賣出、當沖不支援）
+  const recOK = () => ['expense', 'income', 'transfer'].includes(st.mode) && !st.split || (st.mode === 'invest' && st.side === 'buy');
+  const recDefName = () => st.memo.trim() || (st.mode === 'invest' ? `${acct(+st.inv)?.name || ''} 定期定額` : st.mode === 'transfer' ? `${acct(+st.from)?.name || ''} → ${acct(+st.to)?.name || ''}` : catLabel(+st.cat)) || '';
+  const recInit = () => { const d = new Date(st.when + 'T00:00');
+    st.rec = { on: true, auto: true, name: recDefName(), freq: 'monthly', days: [d.getDate()], month: d.getMonth() + 1, every: 2, start_date: st.when, end_date: '' }; };
+  const recDone = r => { const today = ymd(new Date()), base = st.when > today ? st.when : today;   // 這一筆（和今天以前）不會再跳待確認
+    return r.start_date > base ? ymd(addDays(new Date(r.start_date + 'T00:00'), -1)) : base; };
   const defBtn = (k, cur) => !cur || +cur === prefAcct(k) ? (cur && +cur === prefAcct(k) ? '<span class="defmark">預設</span>' : '') : `<button type="button" class="linkbtn defbtn" data-def="${k}" data-cur="${cur}">設為預設</button>`;
   const render = () => {
     const tabs = [['expense', '支出'], ['income', '收入'], ['transfer', '轉帳'], ['invest', '投資'], ['loan', '借貸'], ['journal', '分錄']];
@@ -2466,6 +2489,10 @@ function openForm({ mode, tx, loanType: lt0, cpId, accountId, side, invId, invLi
           <div class="field" id="fpostbox" hidden><label for="fpost">信用卡入帳日 <small class="muted">選填</small></label><input id="fpost" type="date" value="${st.posted}"></div></div>
         <p class="hint" id="fposthint" hidden style="margin:-4px 0 0">入帳日跟消費日不同時才需要填，信用卡帳單會依入帳日分期。</p>
         <div class="field"><label for="fmemo">備註</label><input id="fmemo" value="${esc(st.memo)}" placeholder="選填"></div>
+        ${recOK() ? `<div class="card" style="box-shadow:none;background:var(--bg);padding:12px;display:flex;flex-direction:column;gap:10px">
+          <label class="toggle"><input type="checkbox" id="frec" ${st.rec?.on ? 'checked' : ''}> ${tx ? '用這筆建立定期紀錄' : '設為定期'}</label>
+          ${st.rec?.on ? `<div class="field"><label for="frn">定期紀錄名稱</label><input id="frn" value="${esc(st.rec.name)}" placeholder="例如：房租、00878 定期定額"></div>
+            ${recurSchedHtml(st.rec)}<p class="hint" id="frnext" style="margin:0"></p>` : ''}</div>` : ''}
         <p class="hint" id="ferr" style="color:var(--inc)"></p>
         <div class="formbtns">${tx ? '<button type="button" class="btn danger" id="fdel">刪除</button>' : ''}${tx && st.mode !== 'other' ? '<button type="button" class="btn ghost" id="fcopy">複製</button>' : ''}<button class="btn" type="submit">儲存</button></div>
       </form>`;
@@ -2475,8 +2502,21 @@ function openForm({ mode, tx, loanType: lt0, cpId, accountId, side, invId, invLi
     const cardIn = () => ['facc', 'ffrom', 'fto'].some(k => g(k) && isCard(acct(+g(k).value))) && ['expense', 'income', 'transfer'].includes(st.mode);
     const togglePost = () => { const on = cardIn(); g('fpostbox').hidden = !on; g('fposthint').hidden = !on; g('fdates').classList.toggle('two', on); g('fwhen').previousElementSibling.textContent = on ? '消費日' : '日期'; };
     togglePost(); root.addEventListener('change', e => { if (['facc', 'ffrom', 'fto'].includes(e.target.id)) togglePost(); });
+    const recPreview = () => { const el = g('frnext'); if (!el || !st.rec) return; const x = { ...st.rec, days: [...st.rec.days] }; recurSchedGrab(root, x);
+      if (recurSchedCheck(x)) { el.textContent = ''; return; }
+      const r = { ...x, ...recurSchedRow(x), active: true, done_until: recDone(x), handled: [] }, n = recurNext(r);
+      el.textContent = n ? `這筆照常記下；下一期 ${fmtD(new Date(n + 'T00:00'))}，到期會出現在流水頁的待確認，並列在設定的「定期紀錄」裡。` : '結束日期之前沒有下一期了。'; };
+    if (g('frec')) g('frec').onchange = () => { grab(); if (g('frec').checked) { if (!st.rec) recInit(); st.rec.on = true; } else if (st.rec) st.rec.on = false; render(); };
+    if (g('rfq')) g('rfq').onchange = () => { grab(); st.rec.auto = false; recurFreqChange(st.rec, g('rfq').value); render(); };
+    ['rdays', 'rs', 're', 'rmo', 'rev'].forEach(k => { const el = g(k); if (el) el.addEventListener('input', () => { if (st.rec) st.rec.auto = false; recPreview(); }); });
+    ['rs', 're', 'rmo'].forEach(k => { const el = g(k); if (el) el.addEventListener('change', recPreview); });
+    $$('[data-wd]', root).forEach(c => c.addEventListener('change', recPreview));
+    if (g('fwhen')) g('fwhen').addEventListener('change', () => { if (!st.rec?.on || !st.rec.auto) return; grab(); const d = new Date(st.when + 'T00:00');
+      Object.assign(st.rec, { start_date: st.when, days: st.rec.freq === 'weekly' ? [d.getDay()] : [d.getDate()], month: d.getMonth() + 1 }); render(); });
+    recPreview();
     const grab = () => {
       st.amount = g('famt')?.value ?? st.amount; st.when = g('fwhen')?.value || st.when; st.memo = g('fmemo')?.value ?? st.memo; if (g('fpost')) st.posted = g('fpost').value;
+      if (st.rec?.on && g('frn')) { st.rec.name = g('frn').value; recurSchedGrab(root, st.rec); }
       if (g('fcat')) st.cat = g('fcat').value === '__new' ? '__new' : +g('fcat').value; if (g('facc')) { if (+g('facc').value !== +st.acc) st.accTouched = true; st.acc = +g('facc').value; }
       if (g('fcatn')) { st.newCat = g('fcatn').value; st.newCatP = +g('fcatp').value || null; }
       if (g('flink')) st.invLink = +g('flink').value || null;
@@ -2564,6 +2604,8 @@ function openForm({ mode, tx, loanType: lt0, cpId, accountId, side, invId, invLi
       const amt = num(st.amount);
       // 只選日期；時間沿用原紀錄（新紀錄用打開表單的當下），同一天的先後順序不會亂
       const when = new Date(`${st.when}T${st.time || '12:00'}`); if (!st.when || isNaN(when)) return err('請選日期。');
+      const wantRec = st.rec?.on && recOK();
+      if (wantRec) { if (!st.rec.name.trim()) return err('請輸入定期紀錄名稱。'); const se = recurSchedCheck(st.rec); if (se) return err('定期設定：' + se); }
       const row = { occurred_at: when.toISOString(), memo: st.memo.trim() || null };
       if (showAmt && st.mode !== 'other' && !(amt > 0)) return err('請輸入大於 0 的金額。');
       if (st.mode === 'other' && showAmt && !isFinite(amt)) return err('請輸入金額。');
@@ -2657,12 +2699,22 @@ function openForm({ mode, tx, loanType: lt0, cpId, accountId, side, invId, invLi
           if (!r.error) { const d = await sb.from('transactions').delete().eq('split_id', tx.split_id); if (d.error) throw d.error; }
         } else r = tx ? await sb.from('transactions').update(row).eq('id', tx.id) : await sb.from('transactions').insert({ ...row, ledger_id: S.ledger.id });
         if (r.error) throw r.error;
+        if (wantRec) {   // 用這一筆的內容建立定期紀錄，之後在設定的「定期紀錄」統一管理
+          const inv = row.trade_side === 'buy';
+          if (row.kind === 'transfer' && acct(row.to_account_id)?.currency !== acct(row.account_id)?.currency) toast('兩個帳戶幣別不同，沒有建立定期紀錄。');
+          else {
+            const rule = { ledger_id: S.ledger.id, name: st.rec.name.trim(), kind: inv ? 'invest' : row.kind, account_id: row.account_id,
+              to_account_id: row.kind === 'transfer' ? row.to_account_id : null, category_id: row.kind === 'expense' || row.kind === 'income' ? row.category_id : null,
+              amount: row.amount, memo: row.memo, ...recurSchedRow(st.rec), active: true, done_until: recDone(st.rec) };
+            const x = await sb.from('recurring').insert(rule); if (x.error) throw new Error('紀錄已儲存，但定期紀錄沒建立成功：' + x.error.message);
+          }
+        }
         const last = LS.get('last', {});
         if (st.mode === 'loan') last.loan = +st.my; else if (st.mode === 'transfer') last.transfer = +st.from; else if (st.mode === 'invest') last.invest = +st.cash;
         else if (st.mode === 'income' && st.invLink) last.dividend = +st.acc;
         else if (st.mode === 'expense' || st.mode === 'income') last[st.mode] = +st.acc;
         LS.set('last', last);
-        const msg = tx ? '已更新' : st.mode === 'invest' && st.side === 'day' ? `已記下當沖${st.dayPL === 'loss' ? '虧損' : '獲利'}` : st.mode === 'invest' && st.side === 'sell' ? `已記下，損益 ${money(calcInv().pl, acct(+st.cash)?.currency, true)}` : '已記下';
+        const msg = wantRec ? (tx ? '已更新，並建立定期紀錄' : '已記下，並建立定期紀錄') : tx ? '已更新' : st.mode === 'invest' && st.side === 'day' ? `已記下當沖${st.dayPL === 'loss' ? '虧損' : '獲利'}` : st.mode === 'invest' && st.side === 'sell' ? `已記下，損益 ${money(calcInv().pl, acct(+st.cash)?.currency, true)}` : '已記下';
         await reloadAll(); closeSheet(); toast(msg);
       } catch (er) { err(er.message || String(er)); }
     };
