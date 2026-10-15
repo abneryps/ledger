@@ -64,6 +64,21 @@ nav.tabs .fab span{font-size:24px;line-height:1}
 .summary small{color:var(--muted);font-size:12px;letter-spacing:.04em}
 .summary .num{font-size:18px;overflow-wrap:anywhere}
 .extra{font-size:12px;color:var(--muted);margin-top:8px}
+.cpick{display:flex;flex-direction:column;gap:8px}
+.cpick-top{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.cpick-cur{flex:1 1 140px;min-width:0;font-size:14px;color:var(--muted)}.cpick-cur strong{color:var(--ink)}
+.cpick-top input{flex:1 1 120px;min-width:0;border:1px solid var(--line);border-radius:10px;padding:7px 10px;background:var(--surface);color:var(--ink);font-size:16px}
+.cpick-res{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:4px}
+.cpick-res button{text-align:left;background:none;border:0;padding:9px 10px;border-radius:8px;font:inherit;color:var(--ink);cursor:pointer}
+.cpick-res button:hover{background:var(--accent-soft)}
+.cgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.cgrid button,.cchips button{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;padding:9px 4px;font:inherit;font-size:14px;cursor:pointer}
+.cgrid button.has{border-color:var(--accent);color:var(--accent);font-weight:700}
+.cgrid button.on{background:var(--accent-soft);border-color:var(--accent)}
+.cgrid .cnew{color:var(--muted);border-style:dashed}
+.cchips{display:flex;flex-wrap:wrap;gap:6px;padding:8px;background:var(--accent-soft);border-radius:12px}
+.cchips button{padding:8px 12px}
+.cchips button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700}
 .search{display:flex;gap:8px}
 .sugbox{background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:6px;display:flex;flex-direction:column;max-height:50vh;overflow:auto;margin-top:-4px}
 .sugh{font-size:12px;color:var(--muted);padding:6px 8px 2px}
@@ -426,7 +441,10 @@ function makeDemo(empty = false) {
       if (fn === 'create_ledger') {
         const lid = 'demo-' + Date.now(), nid = t => Math.max(0, ...db[t].map(x => x.id)) + 1;
         db.ledgers.push({ id: lid, name: args.p_name.trim(), base_currency: 'TWD', created_at: new Date().toISOString() }); db.ledger_members.push({ ledger_id: lid, user_id: 'demo', role: 'owner' });
-        if (args.p_copy_from) {
+        if (args.p_copy_from && args.p_cats_only) {
+          [['現金', 'cash', 'asset'], ['銀行帳戶', 'bank', 'asset'], ['信用卡', 'credit_card', 'liability'], ['應收款項', 'receivable', 'receivable'], ['應付款項', 'payable', 'liability']].forEach(([name, t, n], i) => db.accounts.push({ id: nid('accounts'), ledger_id: lid, name, account_type: t, nature: n, currency: 'TWD', hidden: false, sort_order: i + 1, memo: null }));
+          const m = {}; db.categories.filter(c => c.ledger_id === args.p_copy_from).sort((a, b) => (a.parent_id ? 1 : 0) - (b.parent_id ? 1 : 0)).forEach(c => { const id = nid('categories'); m[c.id] = id; db.categories.push({ ...c, id, ledger_id: lid, parent_id: c.parent_id ? m[c.parent_id] : null }); });
+        } else if (args.p_copy_from) {
           db.accounts.filter(a => a.ledger_id === args.p_copy_from).forEach(a => db.accounts.push({ ...a, id: nid('accounts'), ledger_id: lid, reconciled_on: null, reconciled_balance: null }));
           const m = {}; db.categories.filter(c => c.ledger_id === args.p_copy_from).sort((a, b) => (a.parent_id ? 1 : 0) - (b.parent_id ? 1 : 0)).forEach(c => { const id = nid('categories'); m[c.id] = id; db.categories.push({ ...c, id, ledger_id: lid, parent_id: c.parent_id ? m[c.parent_id] : null }); });
           db.counterparties.filter(c => c.ledger_id === args.p_copy_from).forEach(c => db.counterparties.push({ ...c, id: nid('counterparties'), ledger_id: lid }));
@@ -759,8 +777,9 @@ function editLedger(id) {
     <form class="form" id="lf" novalidate>
       <div class="field"><label for="lname">帳本名稱</label><input id="lname" value="${esc(L?.name || '')}" placeholder="例如：家用、越南旅行" maxlength="40"></div>
       ${L ? '' : `<div class="hint" style="margin:0">一開始的帳戶和分類</div>
-        <label class="toggle"><input type="radio" name="lsrc" value="starter" checked style="width:auto;flex:none"> 用預設（現金、銀行、信用卡；飲食、交通…）</label>
-        <label class="toggle"><input type="radio" name="lsrc" value="copy" style="width:auto;flex:none"> 複製「${esc(S.ledger.name)}」的帳戶、分類和借貸對象（不含紀錄和餘額）</label>`}
+        <label class="toggle"><input type="radio" name="lsrc" value="cats" checked style="width:auto;flex:none"> 帳戶用預設（現金、銀行、信用卡…），分類複製「${esc(S.ledger.name)}」</label>
+        <label class="toggle"><input type="radio" name="lsrc" value="copy" style="width:auto;flex:none"> 複製「${esc(S.ledger.name)}」的帳戶、分類和借貸對象（不含紀錄和餘額）</label>
+        <label class="toggle"><input type="radio" name="lsrc" value="starter" style="width:auto;flex:none"> 用系統預設範本</label>`}
       <p class="hint" id="lerr" style="color:var(--inc)"></p>
       <button class="btn" type="submit">${L ? '儲存名稱' : '建立並切換過去'}</button>
     </form>
@@ -777,8 +796,8 @@ function editLedger(id) {
       try {
         if (L) { const { error } = await sb.from('ledgers').update({ name }).eq('id', L.id); if (error) throw error;
           await reloadLedgers(); if (L.id === S.ledger.id) renderShell(); closeSheet(); toast('已改名'); }
-        else { const copy = $('[name=lsrc]:checked', root).value === 'copy';
-          const { data, error } = await sb.rpc('create_ledger', { p_name: name, p_copy_from: copy ? S.ledger.id : null }); if (error) throw error;
+        else { const src = $('[name=lsrc]:checked', root).value;
+          const { data, error } = await sb.rpc('create_ledger', { p_name: name, p_copy_from: src === 'starter' ? null : S.ledger.id, p_cats_only: src === 'cats' }); if (error) throw error;
           await reloadLedgers(); await switchLedger(data); }
       } catch (er) { btn.disabled = false; err(er.message); }
     };
@@ -1087,7 +1106,10 @@ function txRow(t, { showDate = false, selectable = false, accountId = null, pers
   }
   if (t.split_id) title += ' · 分攤';
   const sub = `借 ${J.dr}　貸 ${J.cr}`;
-  if (accountId != null) { const dl = deltaFor(t, accountId); amount = Math.abs(dl); cur = acct(accountId)?.currency; sign = dl < 0 ? '−' : dl > 0 ? '+' : ''; }
+  // 連到這檔投資的配息：錢記在入帳帳戶，這檔的餘額不變，但列表要顯示配息金額
+  const linkedDiv = accountId != null && t.kind === 'income' && t.to_account_id === accountId && t.account_id !== accountId;
+  if (linkedDiv) { amount = +t.amount; cur = acct(t.account_id)?.currency; sign = t.amount < 0 ? '−' : '+'; }
+  else if (accountId != null) { const dl = deltaFor(t, accountId); amount = Math.abs(dl); cur = acct(accountId)?.currency; sign = dl < 0 ? '−' : dl > 0 ? '+' : ''; }
   if (person) { const pd = personDelta(t)[0]; if (pd) { amount = Math.abs(pd[1]); cur = pd[0]; sign = pd[1] > 0 ? '+' : '−'; } }
   const amtCls = cls === 'tr' ? '' : cls;
   amtHtml = `<span class="num ${amtCls}">${sign}${CUR_SIGN[cur] ?? (cur ? cur + ' ' : '')}${nf.format(Math.abs(amount))}</span><small>${when}${postTag ? ' 消費' : ''}</small>${postTag}`;
@@ -1137,7 +1159,7 @@ const applyRange = (q, R) => { const [f, t] = rangeOf(R); if (f) q = q.gte('occu
 function rangeBar(p, R) {
   const [f, t] = rangeOf(R);
   return `<div class="rangebar"><select id="${p}pre" aria-label="時間區間">${PRESETS.map(([k, n]) => `<option value="${k}" ${R.pre === k ? 'selected' : ''}>${n}</option>`).join('')}</select>
-    ${R.pre === 'custom' ? `<div class="rangedates"><input type="date" id="${p}from" value="${f ? ymd(f) : ''}" aria-label="開始日期"><span class="muted">至</span><input type="date" id="${p}to" value="${t ? ymd(addDays(t, -1)) : ''}" aria-label="結束日期"></div>`
+    ${R.pre === 'custom' ? `<div class="rangedates"><input type="date" id="${p}from" value="${f ? ymd(f) : ''}" aria-label="開始日期"><span class="muted">至</span><input type="date" id="${p}to" value="${t ? ymd(addDays(t, -1)) : ''}" aria-label="結束日期"><button type="button" class="btn small" id="${p}go">查詢</button></div>`
       : R.pre === 'all' ? '' : `<span class="hint">${rangeLabel(R)}</span>`}</div>`;
 }
 function bindRangeBar(root, p, R, onChange) {
@@ -1146,7 +1168,20 @@ function bindRangeBar(root, p, R, onChange) {
     if (pre.value === 'custom') { const [f, t] = rangeOf(R); R.from = f ? ymd(f) : ymd(addMonths(som(new Date()), -1)); R.to = t ? ymd(addDays(t, -1)) : ymd(new Date()); }
     R.pre = pre.value; onChange();
   };
-  ['from', 'to'].forEach(k => { const el = $('#' + p + k, root); if (el) el.onchange = () => { R[k] = el.value || null; onChange(); }; });
+  // 自訂日期：改完按「查詢」才送出（輸入到一半的日期不會觸發查詢）
+  const go = $('#' + p + 'go', root);
+  if (go) {
+    const fe = $('#' + p + 'from', root), te = $('#' + p + 'to', root);
+    const ok = v => !v || (/^\d{4}-\d{2}-\d{2}$/.test(v) && +v.slice(0, 4) >= 1990 && +v.slice(0, 4) <= 2100);
+    const dirty = () => go.classList.toggle('ghost', (fe.value || null) === (R.from || null) && (te.value || null) === (R.to || null));
+    fe.oninput = te.oninput = fe.onchange = te.onchange = dirty; dirty();
+    go.onclick = () => {
+      if (!ok(fe.value) || !ok(te.value)) return toast('日期格式不對，年份請填 1990～2100。');
+      if (fe.value && te.value && fe.value > te.value) return toast('開始日期要在結束日期之前。');
+      R.from = fe.value || null; R.to = te.value || null; onChange();
+    };
+    [fe, te].forEach(el => el.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); go.click(); } }));
+  }
 }
 
 /* ---------- 流水 ---------- */
@@ -1662,6 +1697,8 @@ function reconcileAccount(id) {
       if (!to || to > tomorrow) to = tomorrow;
       if (!from) { const f = await sb.from('transactions').select('occurred_at').eq('ledger_id', S.ledger.id).or(`account_id.eq.${id},to_account_id.eq.${id}`).order('occurred_at').limit(1);
         from = f.data?.[0] ? new Date(ymd(new Date(f.data[0].occurred_at)) + 'T00:00') : new Date(ymd(new Date()) + 'T00:00'); }
+      if (!(from < to)) { $('#rcdays', root).innerHTML = '<div class="empty">這段期間沒有日期。</div>'; return; }
+      const MAXD = 3700; if ((to - from) / 864e5 > MAXD) from = addDays(to, -MAXD);   // 最多列約 10 年，避免畫面卡住
       const [endBal, txs] = await Promise.all([balanceBefore(id, to),
         fetchAll(() => sb.from('transactions').select('id,kind,account_id,to_account_id,amount,to_amount,occurred_at').eq('ledger_id', S.ledger.id).or(`account_id.eq.${id},to_account_id.eq.${id}`)
           .gte('occurred_at', from.toISOString()).lt('occurred_at', to.toISOString()).order('id'))]);
@@ -2251,6 +2288,41 @@ function acctOptions(filter, selected) {
 }
 const catTops = kind => S.cats.filter(c => c.kind === kind && !c.parent_id).sort(bySort);
 const catKids = pid => S.cats.filter(c => c.parent_id === pid).sort(bySort);
+// 分類選擇器：上面大分類格子，點了展開子分類；也可以打字搜尋
+function catPickerHtml(kind, selected, openTop) {
+  const sel = selected && selected !== '__new' ? S.catMap.get(+selected) : null;
+  const tops = catTops(kind).filter(c => !c.hidden || c.id === sel?.id || c.id === sel?.parent_id);
+  const open = openTop ?? (sel ? (sel.parent_id || sel.id) : null);
+  const kids = open ? catKids(open).filter(c => !c.hidden || c.id === sel?.id) : [];
+  const path = sel ? (sel.parent_id ? `${S.catMap.get(sel.parent_id)?.name || ''} › ${sel.name}` : sel.name) : selected === '__new' ? '＋ 新增分類' : '（還沒選）';
+  return `<div class="cpick">
+    <div class="cpick-top"><span class="cpick-cur">已選：<strong>${esc(path)}</strong></span><input id="fcq" type="search" placeholder="搜尋分類" autocomplete="off" enterkeyhint="done" aria-label="搜尋分類"></div>
+    <div id="fcres" class="cpick-res" hidden></div>
+    <div class="cgrid">${tops.map(p => `<button type="button" data-ctop="${p.id}" class="${p.id === open ? 'on' : ''} ${sel && (sel.id === p.id || sel.parent_id === p.id) ? 'has' : ''}">${esc(p.name)}</button>`).join('')}
+      <button type="button" data-cpick="__new" class="cnew ${selected === '__new' ? 'has' : ''}">＋ 新增</button></div>
+    ${open && kids.length ? `<div class="cchips">${kids.map(c => `<button type="button" data-cpick="${c.id}" class="${sel?.id === c.id ? 'on' : ''}">${esc(c.name)}</button>`).join('')}</div>` : ''}
+  </div>`;
+}
+function bindCatPicker(root, kind, getSel, onPick) {
+  const box = $('#fcpick', root); if (!box) return;
+  let openTop = null;
+  const redraw = () => { box.innerHTML = catPickerHtml(kind, getSel(), openTop); wire(); };
+  const wire = () => {
+    $$('[data-ctop]', box).forEach(b => b.onclick = () => { const id = +b.dataset.ctop;
+      if (!catKids(id).filter(c => !c.hidden).length) return onPick(id);   // 沒有子分類的大分類直接選
+      openTop = id; redraw(); });
+    $$('[data-cpick]', box).forEach(b => b.onclick = () => onPick(b.dataset.cpick === '__new' ? '__new' : +b.dataset.cpick));
+    const q = $('#fcq', box), res = $('#fcres', box);
+    const search = () => { const k = q.value.trim().toLowerCase(); if (!k) { res.hidden = true; return; }
+      const hits = S.cats.filter(c => c.kind === kind && !c.hidden && (c.name.toLowerCase().includes(k) || (c.parent_id && (S.catMap.get(c.parent_id)?.name || '').toLowerCase().includes(k))))
+        .filter(c => c.parent_id || !catKids(c.id).filter(x => !x.hidden).length).slice(0, 12);
+      res.innerHTML = hits.length ? hits.map(c => `<button type="button" data-cpick="${c.id}">${c.parent_id ? `<span class="muted">${esc(S.catMap.get(c.parent_id)?.name || '')} › </span>` : ''}${esc(c.name)}</button>`).join('') : '<p class="hint" style="margin:6px 8px">找不到，可以按「＋ 新增」。</p>';
+      res.hidden = false; $$('[data-cpick]', res).forEach(b => b.onclick = () => onPick(+b.dataset.cpick)); };
+    q.oninput = search;
+    q.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); const f = $('[data-cpick]', res); if (f) f.click(); } };
+  };
+  wire();
+}
 function catOptions(kind, selected, allowNew = false) {
   const tops = catTops(kind).filter(c => !c.hidden || c.id === selected);
   return tops.map(p => {
@@ -2327,9 +2399,16 @@ function editCat(id, { kind, parent } = {}) {
     };
     const del = $('#cdel', root);
     if (del) del.onclick = async () => {
+      // 先檢查：有子分類、有紀錄、被定期紀錄用到都不能刪，直接說明原因
+      const kids = catKids(c.id), rules = (S.recur || []).filter(r => r.category_id === c.id);
+      if (kids.length) return err(`底下還有 ${kids.length} 個子分類（${kids.slice(0, 3).map(k => k.name).join('、')}${kids.length > 3 ? '…' : ''}），請先刪除或移到其他大分類。`);
+      if (rules.length) return err(`定期紀錄「${rules.map(r => r.name).join('」、「')}」使用這個分類，請先修改那${rules.length > 1 ? '些' : '筆'}定期紀錄。`);
+      const cnt = await sb.from('transactions').select('id', { count: 'exact', head: true }).eq('ledger_id', S.ledger.id).eq('category_id', c.id);
+      if (cnt.error) return err(cnt.error.message);
+      if (cnt.count) return err(`這個分類有 ${nf.format(cnt.count)} 筆紀錄，不能刪除。可以改成勾選「隱藏」，或先把紀錄改到其他分類。`);
       if (!del.dataset.armed) { del.dataset.armed = 1; del.textContent = '再按一次刪除'; return; }
       const r = await sb.from('categories').delete().eq('id', c.id);
-      if (r.error) { delete del.dataset.armed; del.textContent = '刪除'; return err(r.error.code === '23503' ? '這個分類有紀錄或子分類，不能刪除。可以改成勾選「隱藏」。' : r.error.message); }
+      if (r.error) { delete del.dataset.armed; del.textContent = '刪除'; return err(r.error.code === '23503' ? '這個分類還有紀錄、子分類或定期紀錄在用，不能刪除。可以改成勾選「隱藏」。' : r.error.message); }
       await loadRef(); toast('已刪除分類'); closeSheet();
     };
   });
@@ -2483,7 +2562,7 @@ function openForm({ mode, tx, loanType: lt0, cpId, accountId, side, invId, invLi
     if (st.mode === 'expense' || st.mode === 'income') {
       const a = acct(+st.acc);
       const pc = S.prefs?.['cat_' + st.mode], curCat = st.cat && st.cat !== '__new' ? +st.cat : null;
-      body = `<div class="field"><label for="fcat">分類 ${curCat ? (curCat === pc ? '<span class="defmark">預設</span>' : `<button type="button" class="linkbtn defbtn" data-defcat="${st.mode}">設為預設</button>`) : ''}</label><select id="fcat">${catOptions(st.mode, st.cat, true)}</select></div>
+      body = `<div class="field"><label for="fcat">分類 ${curCat ? (curCat === pc ? '<span class="defmark">預設</span>' : `<button type="button" class="linkbtn defbtn" data-defcat="${st.mode}">設為預設</button>`) : ''}</label><select id="fcat" hidden>${st.cat ? '' : '<option value="" selected></option>'}${catOptions(st.mode, st.cat, true)}</select><div id="fcpick">${catPickerHtml(st.mode, st.cat, st.catTop)}</div></div>
         <div class="two" id="fcatnw" ${st.cat === '__new' ? '' : 'hidden'}><div class="field"><label for="fcatn">新分類名稱</label><input id="fcatn" value="${esc(st.newCat || '')}"></div>
           <div class="field"><label for="fcatp">放在</label><select id="fcatp"><option value="">（作為大分類）</option>${catTops(st.mode).filter(p => !p.hidden).map(p => `<option value="${p.id}" ${p.id === st.newCatP ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></div></div>
         <div class="field"><label for="facc">${st.mode === 'income' ? '入帳帳戶' : '帳戶'} ${defBtn(st.mode === 'income' && st.invLink ? 'dividend' : st.mode, st.acc)}</label><select id="facc">${acctOptions(() => true, +st.acc)}</select></div>
@@ -2550,6 +2629,7 @@ function openForm({ mode, tx, loanType: lt0, cpId, accountId, side, invId, invLi
       body = `<div class="field"><label for="facc">帳戶</label><select id="facc" disabled>${acctOptions(() => true, +st.acc)}</select></div><p class="hint">這是${tx.trade_side ? '補登股數' : tx.kind === 'opening_balance' ? '期初餘額' : '餘額調整'}紀錄，只能改${tx.trade_side ? '時間、備註，或刪除後重新補登' : '金額、時間、備註'}。</p>`;
     }
     const showAmt = st.mode !== 'invest' && !(st.mode === 'other' && tx?.trade_side);
+    const sbody = $('#sheetBody'), keepTop = [sbody.scrollTop, sbody.parentElement.scrollTop];
     $('#sheetBody').innerHTML = `
       <div class="sheethead"><h2>${tx ? '編輯紀錄' : copy ? '複製紀錄' : '記一筆'}</h2><button class="iconbtn" data-close aria-label="關閉">✕</button></div>
       <form class="form" id="txf" novalidate>
@@ -2559,7 +2639,10 @@ function openForm({ mode, tx, loanType: lt0, cpId, accountId, side, invId, invLi
         <div class="two" id="fdates"><div class="field"><label for="fwhen">${st.mode === 'other' ? '日期' : '消費日'}</label><input id="fwhen" type="date" value="${st.when}"></div>
           <div class="field" id="fpostbox" hidden><label for="fpost">信用卡入帳日 <small class="muted">選填</small></label><input id="fpost" type="date" value="${st.posted}"></div></div>
         <p class="hint" id="fposthint" hidden style="margin:-4px 0 0">入帳日跟消費日不同時才需要填，信用卡帳單會依入帳日分期。</p>
-        <div class="field"><label for="fmemo">備註</label><input id="fmemo" value="${esc(st.memo)}" placeholder="選填"></div>
+        ${st.mode === 'expense' && st.split && st.splitPayer === 'me'
+          ? `<div class="field"><label for="fmemo">我的份額備註</label><input id="fmemo" value="${esc(st.memo)}" placeholder="選填，例如我點的餐"></div>
+             <div class="field"><label for="fmemo2">${esc((st.splitCp && st.splitCp !== '__new' ? S.cpMap.get(+st.splitCp)?.name : '') || '對方')}的份額備註</label><input id="fmemo2" value="${esc(st.memo2Touched ? (st.memo2 || '') : st.memo)}" placeholder="${esc((catLabel(+st.cat) || '') + ' 分攤')}"></div>`
+          : `<div class="field"><label for="fmemo">備註</label><input id="fmemo" value="${esc(st.memo)}" placeholder="選填"></div>`}
         ${recOK() ? `<div class="card" style="box-shadow:none;background:var(--bg);padding:12px;display:flex;flex-direction:column;gap:10px">
           <label class="toggle"><input type="checkbox" id="frec" ${st.rec?.on ? 'checked' : ''}> ${tx ? '用這筆建立定期紀錄' : '設為定期'}</label>
           ${st.rec?.on ? `<div class="field"><label for="frn">定期紀錄名稱</label><input id="frn" value="${esc(st.rec.name)}" placeholder="例如：房租、00878 定期定額"></div>
@@ -2567,11 +2650,16 @@ function openForm({ mode, tx, loanType: lt0, cpId, accountId, side, invId, invLi
         <p class="hint" id="ferr" style="color:var(--inc)"></p>
         <div class="formbtns">${tx ? '<button type="button" class="btn danger" id="fdel">刪除</button>' : ''}${tx && st.mode !== 'other' ? '<button type="button" class="btn ghost" id="fcopy">複製</button>' : ''}<button class="btn" type="submit">儲存</button></div>
       </form>`;
-    const root = $('#sheetBody');
+    const root = $('#sheetBody'); sbody.scrollTop = keepTop[0]; sbody.parentElement.scrollTop = keepTop[1];
     bindClose(root);
     const g = id => $('#' + id, root);
     const cardIn = () => ['facc', 'ffrom', 'fto'].some(k => g(k) && isCard(acct(+g(k).value))) && ['expense', 'income', 'transfer'].includes(st.mode);
     const togglePost = () => { const on = cardIn(); g('fpostbox').hidden = !on; g('fposthint').hidden = !on; g('fdates').classList.toggle('two', on); g('fwhen').previousElementSibling.textContent = on ? '消費日' : '日期'; };
+    // 分攤：對方的備註還沒自己改過時，跟著我的備註一起變
+    if (g('fmemo2')) { g('fmemo2').addEventListener('input', () => { st.memo2Touched = true; });
+      g('fmemo').addEventListener('input', () => { if (!st.memo2Touched) g('fmemo2').value = g('fmemo').value; });
+      const who = () => { const v = g('fscp')?.value; const n = v && v !== '__new' ? S.cpMap.get(+v)?.name : (v === '__new' ? g('fscpn')?.value.trim() : ''); g('fmemo2').previousElementSibling.textContent = `${n || '對方'}的份額備註`; };
+      g('fscp')?.addEventListener('change', who); g('fscpn')?.addEventListener('input', who); who(); }
     togglePost(); root.addEventListener('change', e => { if (['facc', 'ffrom', 'fto'].includes(e.target.id)) togglePost(); });
     const recPreview = () => { const el = g('frnext'); if (!el || !st.rec) return; const x = { ...st.rec, days: [...st.rec.days] }; recurSchedGrab(root, x);
       if (recurSchedCheck(x)) { el.textContent = ''; return; }
@@ -2586,7 +2674,7 @@ function openForm({ mode, tx, loanType: lt0, cpId, accountId, side, invId, invLi
       Object.assign(st.rec, { start_date: st.when, days: st.rec.freq === 'weekly' ? [d.getDay()] : [d.getDate()], month: d.getMonth() + 1 }); render(); });
     recPreview();
     const grab = () => {
-      st.amount = g('famt')?.value ?? st.amount; st.when = g('fwhen')?.value || st.when; st.memo = g('fmemo')?.value ?? st.memo; if (g('fpost')) st.posted = g('fpost').value;
+      st.amount = g('famt')?.value ?? st.amount; st.when = g('fwhen')?.value || st.when; st.memo = g('fmemo')?.value ?? st.memo; if (g('fmemo2')) st.memo2 = g('fmemo2').value; if (g('fpost')) st.posted = g('fpost').value;
       if (st.rec?.on && g('frn')) { st.rec.name = g('frn').value; recurSchedGrab(root, st.rec); }
       if (g('fcat')) st.cat = g('fcat').value === '__new' ? '__new' : +g('fcat').value; if (g('facc')) { if (+g('facc').value !== +st.acc) st.accTouched = true; st.acc = +g('facc').value; }
       if (g('fcatn')) { st.newCat = g('fcatn').value; st.newCatP = +g('fcatp').value || null; }
@@ -2658,8 +2746,10 @@ function openForm({ mode, tx, loanType: lt0, cpId, accountId, side, invId, invLi
     if (st.mode === 'invest' && st.side !== 'day') { drawHold(); updInv(); loadHold(); }
     const cpSel = g('fcp');
     if (cpSel) { const s = () => g('fcpnw').hidden = cpSel.value !== '__new'; cpSel.addEventListener('change', s); s(); }
+    if (g('fcat')) bindCatPicker(root, st.mode, () => st.cat, v => { const s2 = g('fcat'); s2.value = String(v); s2.onchange(); if (v === '__new') { render(); setTimeout(() => g('fcatn')?.focus(), 50); } });
     if (g('fcat')) g('fcat').onchange = () => { grab(); if ((st.mode === 'income' && g('fcat').value !== '__new' && !!S.catMap.get(+st.cat)?.is_investment !== !!g('flink')) || g('fcat').value !== '__new') return render(); g('fcatnw').hidden = g('fcat').value !== '__new'; if (g('fcat').value === '__new') g('fcatn').focus(); };
-    if (!tx) setTimeout(() => (g('famt') || g('fdayamt') || g('fqty'))?.focus(), 220);
+    // 只有剛打開記一筆時才自動跳到金額；之後切換選項重畫畫面不再搶焦點（避免畫面跳回最上面）
+    if (!tx && !st._focused) { st._focused = true; setTimeout(() => (g('famt') || g('fdayamt') || g('fqty'))?.focus(), 220); }
     $$('[data-defcat]', root).forEach(b => b.onclick = async e => { e.preventDefault(); grab(); if (!st.cat || st.cat === '__new') return;
       try { await savePrefs({ ['cat_' + b.dataset.defcat]: +st.cat }); b.outerHTML = '<span class="defmark">預設</span>'; toast('已設為預設分類', 1200); } catch (er) { fail(er); } });
     const cp2 = g('fcopy'); if (cp2) cp2.onclick = () => openForm({ tx, copy: true });
@@ -2701,7 +2791,7 @@ function openForm({ mode, tx, loanType: lt0, cpId, accountId, side, invId, invLi
             const A = acct(+st.acc); if (!A || isDebt(A)) return err('請選你付款的帳戶。');
             const recv = defaultDebt('receivable', A.currency); if (!recv) return err('帳本裡還沒有應收款項帳戶，請先到帳戶頁新增。');
             if (mine > 0) rows.push({ ...base, kind: 'expense', account_id: A.id, to_account_id: null, to_amount: null, amount: mine, category_id: +st.cat, counterparty_id: null, memo: row.memo, split_total: total });
-            if (other > 0) rows.push({ ...base, kind: 'transfer', account_id: A.id, to_account_id: recv, amount: other, to_amount: other, category_id: null, counterparty_id: cp, memo: row.memo || `${cname} 分攤`, split_total: mine > 0 ? null : total });
+            if (other > 0) rows.push({ ...base, kind: 'transfer', account_id: A.id, to_account_id: recv, amount: other, to_amount: other, category_id: null, counterparty_id: cp, memo: ((st.memo2Touched ? st.memo2 : st.memo) || '').trim() || `${cname} 分攤`, split_total: mine > 0 ? null : total });
           } else {
             const pay = defaultDebt('payable', 'TWD'); if (!pay) return err('帳本裡還沒有應付款項帳戶，請先到帳戶頁新增。');
             if (!(mine > 0)) return err('對方先付、我也沒有份額的話，就不用記這筆。');
@@ -2814,7 +2904,8 @@ function openForm({ mode, tx, loanType: lt0, cpId, accountId, side, invId, invLi
       const lts2 = toLocalInput(new Date(ref.occurred_at));
       Object.assign(st, { mode: 'expense', split: true, splitPayer: payerThem ? 'them' : 'me', amount: String(total), cat: exp?.category_id ?? st.cat,
         acc: payerThem ? st.acc : (exp || loan).account_id, splitCp: (payerThem ? exp.counterparty_id : loan?.counterparty_id) ?? null,
-        splitShare: Math.abs(mine * 2 - total) < 0.01 ? 'half' : 'custom', mine: String(mine), memo: exp?.memo || '' });
+        splitShare: Math.abs(mine * 2 - total) < 0.01 ? 'half' : 'custom', mine: String(mine), memo: exp?.memo || (loan && !exp ? loan.memo : '') || '',
+        memo2: loan?.memo || '', memo2Touched: !!loan });
       if (!copy) Object.assign(st, { when: lts2.slice(0, 10), time: lts2.slice(11) });
       if (!st.cat) st.cat = catTops('expense')[0]?.id;
       render();
