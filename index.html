@@ -65,6 +65,13 @@ nav.tabs .fab span{font-size:24px;line-height:1}
 .summary .num{font-size:18px;overflow-wrap:anywhere}
 .extra{font-size:12px;color:var(--muted);margin-top:8px}
 .search{display:flex;gap:8px}
+.sugbox{background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:6px;display:flex;flex-direction:column;max-height:50vh;overflow:auto;margin-top:-4px}
+.sugh{font-size:12px;color:var(--muted);padding:6px 8px 2px}
+.sugi{text-align:left;background:none;border:0;font:inherit;color:var(--ink);padding:9px 10px;border-radius:8px;cursor:pointer}
+.sugi:hover,.sugi:focus{background:var(--accent-soft)}
+.sugq{border-top:1px solid var(--line);margin-top:4px;color:var(--accent)}
+.tags{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.tag{background:var(--accent-soft);color:var(--accent);border:0;border-radius:999px;padding:6px 12px;font:inherit;font-size:14px;cursor:pointer}
 .search input{flex:1;min-width:0;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:9px 12px;font-size:16px}
 .search .btn{flex:none}
 .daygroup{display:flex;flex-direction:column}
@@ -102,6 +109,8 @@ nav.tabs .fab span{font-size:24px;line-height:1}
 .bar .fill{height:100%;border-radius:5px;background:var(--exp)}
 .bar .fill.inc{background:var(--inc)}
 .bar span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cursel{width:auto;min-width:92px;border:0;border-radius:10px;background:var(--bg);color:var(--ink);font-weight:700;padding:0 12px;font-size:15px}
+.cursel.fx{background:var(--accent);color:var(--accent-ink)}
 .seg{display:flex;background:var(--bg);border-radius:10px;padding:3px;gap:3px}
 .seg button{flex:1;border:0;background:none;border-radius:8px;padding:8px 0;font-weight:500;color:var(--muted)}
 .seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow);font-weight:700}
@@ -201,6 +210,7 @@ input[type="date"]::-webkit-datetime-edit,input[type="datetime-local"]::-webkit-
 .login{max-width:380px;margin:0 auto;padding:calc(48px + env(safe-area-inset-top,0px)) 16px 32px;display:flex;flex-direction:column;gap:18px}
 .login h1{font-size:28px;margin:0}
 .login p{margin:0;color:var(--muted)}
+.toastbtn{margin-left:10px;background:none;border:0;color:var(--accent-soft);font:inherit;font-weight:700;text-decoration:underline;cursor:pointer;padding:0}
 #toast{position:fixed;left:50%;top:calc(14px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:30;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:14px;max-width:calc(100% - 32px);box-shadow:var(--shadow)}
 .spinner{padding:40px;text-align:center;color:var(--muted)}
 svg text{fill:var(--muted);font-size:11px;font-family:var(--f-body)}
@@ -281,8 +291,8 @@ function demoSeed() {
   T('transfer', at(20, 11), 9, 14270.25, { to: 3, to_amount: 16129, qty: 15, price: 1080, fee: 23, tax: 48, side: 'sell', memo: '先賣一半' });
   T('expense', at(18, 20), 4, -1290, { cat: clothes, memo: '外套退貨' });
   T('opening_balance', at(130, 9), 11, 30000);
-  T('income', at(3, 14), 3, 1500, { cat: invInc, memo: '當沖 南亞科 2408' });
-  T('expense', at(2, 14), 3, 900, { cat: invLoss, memo: '當沖 國巨 2327' });
+  T('income', at(3, 14), 3, 1500, { cat: invInc, memo: '當沖 南亞科 2408' }); transactions.at(-1).day_trade = true;
+  T('expense', at(2, 14), 3, 900, { cat: invLoss, memo: '當沖 國巨 2327' }); transactions.at(-1).day_trade = true;
   T('income', at(25, 14), 11, 2300, { cat: invInc, memo: '當沖獲利' });
   T('expense', at(15, 14), 11, 1800, { cat: invLoss, memo: '當沖虧損' });
   T('expense', at(8, 12), 11, 3600, { cat: party, memo: '交割戶直接付聚餐' });
@@ -295,6 +305,7 @@ function demoSeed() {
   T('transfer', at(60, 18), 1, 500, { to: 7, memo: '朋友借' });
   T('transfer', at(50, 18), 7, 500, { to: 1, memo: '朋友還' });
   T('transfer', at(70, 12), 4, 1800, { to: 7, memo: '團購代墊' });
+  T('expense', at(9, 13), 6, 18.5, { cat: meal, memo: '出差午餐' }); T('expense', at(8, 20), 6, 42, { cat: party, memo: '出差聚餐' }); T('income', at(4, 9), 6, 1.25, { cat: interest, memo: '外幣存款利息' });
   // 每月 20 號全額繳上期（5 號結帳）的信用卡帳單
   for (let n = 125; n >= 0; n--) { const d = at(n, 10); if (d.getDate() !== 20) continue;
     const cut = new Date(d.getFullYear(), d.getMonth(), 6).toISOString();
@@ -305,7 +316,7 @@ function demoSeed() {
   const buy = new Date(lastClose); buy.setDate(buy.getDate() - 1); buy.setHours(22, 10);
   const post = new Date(lastClose); post.setDate(post.getDate() + 2);
   T('expense', buy, 4, 1680, { cat: clothes, memo: '網購 跨期入帳' }); transactions.at(-1).posted_on = ymd(post);
-  for (const t of transactions) { t.posted_on ??= null; t.post_date = t.posted_on || ymd(new Date(t.occurred_at)); }
+  for (const t of transactions) { t.day_trade ??= false; t.posted_on ??= null; t.post_date = t.posted_on || ymd(new Date(t.occurred_at)); }
   const recurring = [
     { id: 1, ledger_id: L, name: '房租', kind: 'expense', account_id: 3, to_account_id: null, category_id: rent, amount: 15000, memo: null, freq: 'monthly', days: [1], month: null, every: 1, start_date: ymd(at(40, 0)), end_date: null, done_until: ymd(at(40, 0)), handled: [], active: true },
     { id: 2, ledger_id: L, name: '00878 定期定額', kind: 'invest', account_id: 3, to_account_id: 10, category_id: null, amount: 3000, memo: '定期定額', freq: 'monthly', days: [6, 16], month: null, every: 1, start_date: ymd(at(40, 0)), end_date: null, done_until: ymd(at(20, 0)), handled: [], active: true },
@@ -363,7 +374,7 @@ function makeDemo(empty = false) {
     lt(k, v) { this.f.push(r => r[k] < v); return this; }
     or(expr) {
       const parts = splitTop(expr).map(p => { const [col, op, ...rest] = p.split('.'); const val = rest.join('.');
-        return op === 'in' ? (r => val.replace(/[()]/g, '').split(',').includes(String(r[col]))) : (r => String(r[col]) === val); });
+        return op === 'in' ? (r => val.replace(/[()]/g, '').split(',').includes(String(r[col]))) : op === 'ilike' ? (r => (r[col] || '').toLowerCase().includes(val.replace(/\*/g, '').toLowerCase())) : (r => String(r[col]) === val); });
       this.f.push(r => parts.some(fn => fn(r))); return this;
     }
     order(k, o = {}) { this.ord.push([k, o.ascending !== false]); return this; }
@@ -379,7 +390,7 @@ function makeDemo(empty = false) {
           if (this.t === 'counterparties' && table.some(c => c.name === r.name)) return { data: null, error: { code: '23505', message: '已經有同名的對象' } };
           r.id = Math.max(0, ...table.map(x => x.id)) + 1;
           if (this.t === 'counterparties') Object.assign(r, { hidden: false, memo: r.memo ?? null, sort_order: null });
-          if (this.t === 'transactions') { r.posted_on ??= null; r.post_date = r.posted_on || ymd(new Date(r.occurred_at)); }
+          if (this.t === 'transactions') { r.day_trade ??= false; r.posted_on ??= null; r.post_date = r.posted_on || ymd(new Date(r.occurred_at)); }
           if (this.t === 'transactions') for (const k of ['counterparty_id', 'to_account_id', 'to_amount', 'category_id', 'quantity', 'unit_price', 'fee', 'tax', 'trade_side', 'memo', 'split_id', 'split_total']) r[k] ??= null;
           if (this.t === 'accounts') Object.assign(r, { hidden: false, memo: r.memo ?? null, sort_order: r.sort_order ?? null });
           if (this.t === 'categories') Object.assign(r, { hidden: false, parent_id: r.parent_id ?? null });
@@ -451,7 +462,11 @@ const WD = ['日', '一', '二', '三', '四', '五', '六'];
 const dayKey = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const som = d => new Date(d.getFullYear(), d.getMonth(), 1);
 const addMonths = (d, n) => new Date(d.getFullYear(), d.getMonth() + n, 1);
-function toast(msg, ms = 2600) { const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(() => t.hidden = true, ms); }
+function toast(msg, ms = 2600, action) {
+  const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toast._t);
+  if (action) { const b = document.createElement('button'); b.type = 'button'; b.className = 'toastbtn'; b.textContent = action.label; b.onclick = () => { t.hidden = true; clearTimeout(toast._t); action.run(); }; t.append(' ', b); }
+  toast._t = setTimeout(() => t.hidden = true, ms);
+}
 function fail(e) { console.error(e); toast('出錯了：' + (e?.message || e)); }
 async function fetchAll(build) { // 分頁取回超過 1000 筆
   const out = []; for (let i = 0; ; i += 1000) { const { data, error } = await build().range(i, i + 999); if (error) throw error; out.push(...data); if (data.length < 1000) return out; }
@@ -461,7 +476,7 @@ async function fetchAll(build) { // 分頁取回超過 1000 筆
 const S = { user: null, ledger: null, accts: [], acctMap: new Map(), bal: new Map(), cats: [], catMap: new Map(),
             cps: [], cpMap: new Map(), cpBal: [], month: som(new Date()), view: LS.get('view', 'flow'), q: '',
             showZero: LS.get('showZero', false), sel: new Set() };
-const TX_COLS = 'id,kind,occurred_at,posted_on,post_date,account_id,to_account_id,amount,to_amount,category_id,memo,counterparty_id,quantity,unit_price,fee,tax,trade_side,split_id,split_total';
+const TX_COLS = 'id,kind,occurred_at,posted_on,post_date,day_trade,account_id,to_account_id,amount,to_amount,category_id,memo,counterparty_id,quantity,unit_price,fee,tax,trade_side,split_id,split_total';
 const INV_TYPES = ['stock', 'fund', 'investment'];
 const isInv = a => a && INV_TYPES.includes(a.account_type);
 const qf = new Intl.NumberFormat('zh-TW', { maximumFractionDigits: 4 });
@@ -720,7 +735,7 @@ function openMe() {
 async function switchLedger(id) {
   const L = S.ledgers.find(l => l.id === id); if (!L) return;
   S.ledger = L; LS.set('ledger', id);
-  Object.assign(S, { ah: {}, cardK: {}, rcR: {}, q: '', fc: '' }); LS.set('flowCat', '');
+  Object.assign(S, { ah: {}, cardK: {}, rcR: {}, q: '', ft: [] }); LS.set('flowTags', []);
   closeAllSheets(); await loadRef(); renderShell(); toast(`已切換到「${L.name}」`);
 }
 async function reloadLedgers() { await ensureLedger(); }
@@ -1135,12 +1150,41 @@ function bindRangeBar(root, p, R, onChange) {
 }
 
 /* ---------- 流水 ---------- */
+// 搜尋：備註、分類名稱（含子分類）、帳戶名稱、借貸對象名字
+function searchOr(q) {
+  const k = q.toLowerCase(), has = x => (x || '').toLowerCase().includes(k);
+  const cats = S.cats.filter(c => has(c.name)).map(c => c.id), catIds = [...new Set([...cats, ...S.cats.filter(c => cats.includes(c.parent_id)).map(c => c.id)])];
+  const accIds = S.accts.filter(a => has(a.name)).map(a => a.id), cpIds = [...S.cpMap.values()].filter(c => has(c.name)).map(c => c.id);
+  const safe = q.replace(/[,()*%\\]/g, ' ').trim();
+  return [`memo.ilike.*${safe}*`, catIds.length && `category_id.in.(${catIds})`, accIds.length && `account_id.in.(${accIds})`, accIds.length && `to_account_id.in.(${accIds})`, cpIds.length && `counterparty_id.in.(${cpIds})`].filter(Boolean).join(',');
+}
 // 分類篩選：選大分類時連同底下的子分類一起
 function flowCatIds(v) {
   if (!v) return null;
   const [k, id] = v.split(':'), n = +id;
   if (!S.catMap.has(n)) return null;
   return k === 'p' ? [n, ...catKids(n).map(c => c.id)] : [n];
+}
+// 篩選標籤：{ t: 'cat' | 'acct' | 'cp', id, all }（分類 all = 連子分類）；同類型之間是「或」，不同類型之間是「且」
+const tagLabel = g => g.t === 'cat' ? `分類：${catPath(g.id)}${g.all && catKids(g.id).length ? '（含子分類）' : ''}` : g.t === 'acct' ? `帳戶：${acct(g.id)?.name || '?'}` : `對象：${S.cpMap.get(g.id)?.name || '?'}`;
+const catPath = id => { const c = S.catMap.get(id); if (!c) return '?'; const p = c.parent_id ? S.catMap.get(c.parent_id) : null; return p ? `${p.name} › ${c.name}` : c.name; };
+function applyTags(q, tags) {
+  const cats = [...new Set(tags.filter(g => g.t === 'cat').flatMap(g => g.all ? [g.id, ...catKids(g.id).map(c => c.id)] : [g.id]))];
+  const accs = tags.filter(g => g.t === 'acct').map(g => g.id), cps = tags.filter(g => g.t === 'cp').map(g => g.id);
+  if (cats.length) q = q.in('category_id', cats);
+  if (accs.length) q = q.or(`account_id.in.(${accs}),to_account_id.in.(${accs})`);
+  if (cps.length) q = q.in('counterparty_id', cps);
+  return q;
+}
+// 打字時的建議：分類、帳戶、對象
+function flowSuggest(text) {
+  const k = text.trim().toLowerCase(); if (!k) return '';
+  const has = x => (x || '').toLowerCase().includes(k), taken = g => (S.ft || []).some(x => x.t === g.t && x.id === g.id);
+  const cats = S.cats.filter(c => !c.hidden && has(c.name)).map(c => ({ t: 'cat', id: c.id, all: !c.parent_id })).filter(g => !taken(g)).slice(0, 6);
+  const accs = S.accts.filter(a => !a.hidden && has(a.name)).map(a => ({ t: 'acct', id: a.id })).filter(g => !taken(g)).slice(0, 6);
+  const cps = [...S.cpMap.values()].filter(c => !c.hidden && has(c.name)).map(c => ({ t: 'cp', id: c.id })).filter(g => !taken(g)).slice(0, 6);
+  const sec = (name, list) => list.length ? `<div class="sugh">${name}</div>${list.map(g => `<button type="button" class="sugi" data-tag='${JSON.stringify(g)}'>${esc(tagLabel(g).replace(/^[^：]+：/, ''))}</button>`).join('')}` : '';
+  return sec('分類', cats) + sec('帳戶', accs) + sec('借貸對象', cps) + `<button type="button" class="sugi sugq" data-q="1">🔍 搜尋「${esc(text.trim())}」（備註、分類、帳戶、對象）</button>`;
 }
 function flowCatOptions(sel) {
   const grp = (kind, label) => `<optgroup label="${label}">${catTops(kind).filter(p => !p.hidden).map(p => {
@@ -1152,8 +1196,9 @@ function flowCatOptions(sel) {
 async function viewFlow() {
   const v = $('#view'), L = S.ledger.id, m = S.month;
   const label = `${m.getFullYear()} 年 ${m.getMonth() + 1} 月`;
-  S.fm ??= LS.get('flowMode', 'month'); S.fr ??= LS.get('flowRange', { pre: '3m' }); S.flowShow ??= 300; S.fc ??= LS.get('flowCat', '');
-  const catIds = flowCatIds(S.fc);
+  S.fm ??= LS.get('flowMode', 'month'); S.fr ??= LS.get('flowRange', { pre: '3m' }); S.flowShow ??= 300;
+  if (!S.ft) { S.ft = LS.get('flowTags', []); const old = LS.get('flowCat', ''); if (old && !S.ft.length) { const [k, id] = old.split(':'); S.ft = [{ t: 'cat', id: +id, all: k === 'p' }]; } LS.set('flowCat', ''); }
+  S.ft = S.ft.filter(g => g.t === 'cat' ? S.catMap.has(g.id) : g.t === 'acct' ? !!acct(g.id) : S.cpMap.has(g.id));
   const rangeMode = S.fm === 'range';
   const fresh = S.accts.every(a => Math.abs(S.bal.get(a.id) || 0) < 0.005);
   v.innerHTML = `
@@ -1161,9 +1206,10 @@ async function viewFlow() {
       <div class="two"><button class="btn" id="startRec">盤點帳戶餘額</button><button class="btn ghost" id="startAdd">＋ 新增帳戶</button></div></div>` : ''}
     ${recurDue().length ? `<button class="card recurbanner" id="recurDue">⏰ 有 <strong>${recurDue().length}</strong> 筆定期紀錄到期，待確認 ›</button>` : ''}
     <div class="seg" role="group"><button type="button" data-fm="month" aria-pressed="${!rangeMode}">按月</button><button type="button" data-fm="range" aria-pressed="${rangeMode}">選擇區間</button></div>
-    <form class="search" id="qf" role="search"><input id="q" type="search" enterkeyhint="search" placeholder="${rangeMode ? '在這個區間搜尋備註' : '搜尋備註（全部時間）'}" value="${esc(S.q)}" aria-label="搜尋備註">
+    <form class="search" id="qf" role="search"><input id="q" type="search" enterkeyhint="search" placeholder="搜尋備註、分類、帳戶、對象" value="${esc(S.q)}" aria-label="搜尋備註、分類、帳戶、借貸對象">
       ${S.q ? '<button type="button" class="btn small ghost" id="qclear">清除</button>' : ''}<button type="submit" class="btn small">搜尋</button></form>
-    <div class="rangebar"><select id="flcat" aria-label="分類篩選" style="flex:1;min-width:0">${flowCatOptions(S.fc)}</select>${S.fc ? '<button type="button" class="btn small ghost" id="flcatclear">全部分類</button>' : ''}</div>
+    <div class="sugbox" id="qsug" hidden></div>
+    ${S.ft.length ? `<div class="tags">${S.ft.map((g, i) => `<button type="button" class="tag" data-untag="${i}" aria-label="取消 ${esc(tagLabel(g))}">${esc(tagLabel(g))} <span aria-hidden="true">✕</span></button>`).join('')}${S.ft.length > 1 ? '<button type="button" class="linkbtn" id="untagall">全部清除</button>' : ''}</div>` : ''}
     ${S.q && !rangeMode ? '' : `<div class="card">${rangeMode ? rangeBar('fl', S.fr) : `<div class="monthbar"><button id="prev" aria-label="上個月">‹</button><label class="pickwrap"><strong>${label} <span class="caret">▾</span></strong><input type="month" id="flpick" aria-label="選擇月份" value="${m.getFullYear()}-${pad(m.getMonth() + 1)}"></label><button id="next" aria-label="下個月">›</button></div>`}
       <div class="summary" id="sum" style="margin-top:${rangeMode ? '12px' : '0'}"><div><small>支出</small><span class="num exp">…</span></div><div><small>收入</small><span class="num inc">…</span></div><div><small>結餘</small><span class="num">…</span></div></div><div class="extra" id="sumx"></div></div>`}
     <div id="days"><div class="spinner">載入中…</div></div>`;
@@ -1172,9 +1218,17 @@ async function viewFlow() {
   if (fresh) { $('#startRec').onclick = () => reconcile(); $('#startAdd').onclick = () => editAccount(null); }
   const rd = $('#recurDue'); if (rd) rd.onclick = () => openRecurDue();
   // 打完字按 Enter 或「搜尋」才查詢，輸入中不會一直重新整理畫面
-  const fc = $('#flcat'); fc.onchange = () => { S.fc = fc.value; LS.set('flowCat', S.fc); S.flowShow = 300; viewFlow(); };
-  const fcc = $('#flcatclear'); if (fcc) fcc.onclick = () => { S.fc = ''; LS.set('flowCat', ''); S.flowShow = 300; viewFlow(); };
-  const q = $('#q');
+  const setTags = t => { S.ft = t; LS.set('flowTags', t); S.flowShow = 300; viewFlow(); };
+  $$('[data-untag]', v).forEach(b => b.onclick = () => setTags(S.ft.filter((_, i) => i !== +b.dataset.untag)));
+  const ua = $('#untagall'); if (ua) ua.onclick = () => setTags([]);
+  const q = $('#q'), sug = $('#qsug');
+  const showSug = () => { const h = flowSuggest(q.value); sug.innerHTML = h; sug.hidden = !h; };
+  q.addEventListener('input', showSug); q.addEventListener('focus', showSug);
+  q.addEventListener('blur', () => setTimeout(() => { sug.hidden = true; }, 200));
+  sug.addEventListener('mousedown', e => e.preventDefault());   // 點建議時不要先觸發 blur
+  sug.onclick = e => { const b = e.target.closest('.sugi'); if (!b) return;
+    if (b.dataset.q) { $('#qf').requestSubmit ? $('#qf').requestSubmit() : $('#qf').dispatchEvent(new Event('submit', { cancelable: true })); return; }
+    const g = JSON.parse(b.dataset.tag); q.value = ''; if (S.q) S.q = ''; setTags([...S.ft, g]); };
   $('#qf').onsubmit = e => { e.preventDefault(); const val = q.value.trim(); q.blur(); if (val === S.q) return; S.q = val; S.flowShow = 300; viewFlow(); };
   q.oninput = () => { if (!q.value && S.q) { S.q = ''; S.flowShow = 300; viewFlow(); } };
   const qc = $('#qclear'); if (qc) qc.onclick = () => { S.q = ''; S.flowShow = 300; viewFlow(); };
@@ -1182,15 +1236,15 @@ async function viewFlow() {
     const fp = $('#flpick'); fp.onchange = () => { if (!fp.value) return; S.month = new Date(+fp.value.slice(0, 4), +fp.value.slice(5, 7) - 1, 1); S.flowShow = 300; viewFlow(); }; }
   let txs;
   if (S.q && !rangeMode) {
-    let rq = sb.from('transactions').select(TX_COLS).eq('ledger_id', L).ilike('memo', `%${S.q}%`); if (catIds) rq = rq.in('category_id', catIds);
+    let rq = applyTags(sb.from('transactions').select(TX_COLS).eq('ledger_id', L).or(searchOr(S.q)), S.ft);
     const r = await rq.order('occurred_at', { ascending: false }).limit(300);
     if (r.error) throw r.error; txs = r.data;
   } else {
     txs = await fetchAll(() => {
       let q = sb.from('transactions').select(TX_COLS).eq('ledger_id', L);
       q = rangeMode ? applyRange(q, S.fr) : q.gte('occurred_at', m.toISOString()).lt('occurred_at', addMonths(m, 1).toISOString());
-      if (S.q) q = q.ilike('memo', `%${S.q}%`);
-      if (catIds) q = q.in('category_id', catIds);
+      if (S.q) q = q.or(searchOr(S.q));
+      q = applyTags(q, S.ft);
       return q.order('occurred_at', { ascending: false }).order('id', { ascending: false });
     });
     if (!$('#sum')) return;
@@ -1206,7 +1260,7 @@ async function viewFlow() {
   }
   const box = $('#days');
   if (!box) return;
-  if (!txs.length) { box.innerHTML = `<div class="card empty">${S.q || S.fc ? '找不到符合的紀錄。' : rangeMode ? '這段期間沒有紀錄。' : '這個月還沒有紀錄。按下方「記一筆」開始。'}</div>`; return; }
+  if (!txs.length) { box.innerHTML = `<div class="card empty">${S.q || S.ft.length ? '找不到符合的紀錄。' : rangeMode ? '這段期間沒有紀錄。' : '這個月還沒有紀錄。按下方「記一筆」開始。'}</div>`; return; }
   const showYear = S.q || (rangeMode && new Date(txs[0].occurred_at).getFullYear() !== new Date(txs[txs.length - 1].occurred_at).getFullYear());
   const draw = () => {
     const shown = txs.slice(0, S.flowShow), groups = new Map();
@@ -1325,7 +1379,7 @@ async function viewAccts() {
         return `<button class="row" data-acct="${a.id}"><span class="main"><span class="t">${esc(a.name)}</span>${a.currency !== 'TWD' ? `<span class="s">${a.currency}</span>` : ''}</span><span class="amt num ${b < 0 ? 'exp' : ''}">${money(b, a.currency)}</span></button>`; }).join('')}</div>`;
   }).join('');
   v.innerHTML = `
-    <div class="card"><small class="muted">淨資產（台幣）</small><div class="num bigtotal">${money(net.TWD || 0)}</div>
+    <div class="card"><small class="muted">淨資產（台幣・投資以成本計）</small><div class="num bigtotal">${money(net.TWD || 0)}</div>
       ${Object.entries(net).filter(([c]) => c !== 'TWD').length ? `<div class="extra">外幣：${Object.entries(net).filter(([c]) => c !== 'TWD').map(([c, x]) => money(x, c)).join('，')}</div>` : ''}</div>
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
       <label class="toggle" style="flex:1"><input type="checkbox" id="zero" ${S.showZero ? 'checked' : ''}> 顯示餘額為 0 的帳戶</label>
@@ -1448,7 +1502,7 @@ function editAccount(id, fromManager = false) {
     };
   });
 }
-// 未分配成本：列出組成它的紀錄（最後一次補登股數之後、沒有股數的金額），轉入可以逐筆改成買進
+// 待補股數：①只記了金額的買進（定期紀錄記入）②沒有股數的轉入／期初餘額（未分配成本），都在這裡補
 async function openPool(id) {
   asPage('pool' + id, () => openPool(id));
   const a = acct(id), cur = a.currency;
@@ -1456,17 +1510,22 @@ async function openPool(id) {
   asPage('pool' + id, () => openPool(id));
   let start = 0; txs.forEach((t, i) => { if (t.trade_side === 'buy' && t.kind !== 'transfer' && !(+t.unit_price === 0 && t.unit_price != null)) start = i + 1; });
   const items = txs.slice(start).filter(t => !t.trade_side && deltaFor(t, id) !== 0).reverse();
+  const pend = txs.filter(t => t.trade_side === 'buy' && t.kind === 'transfer' && t.to_account_id === id && t.quantity == null).reverse();
   const canBuy = t => t.kind === 'transfer' && t.to_account_id === id;
   const fmt = t => { const z = new Date(t.occurred_at); return `${z.getFullYear()}/${z.getMonth() + 1}/${z.getDate()}`; };
   const what = t => canBuy(t) ? `從 ${esc(acct(t.account_id)?.name || '')} 轉入` : t.kind === 'opening_balance' ? '期初餘額' : t.kind === 'balance_adjustment' ? '餘額調整' : t.kind === 'transfer' ? `轉出到 ${esc(acct(t.to_account_id)?.name || '')}` : esc(catLabel(t.category_id) || '');
-  openSheet(`<div class="sheethead"><h2>未分配成本 · ${esc(a.name)}</h2><button class="iconbtn" data-close aria-label="關閉">✕</button></div>
-    <p class="hint" style="margin:0 0 10px">這些紀錄只有金額、沒有股數。轉入的可以按「改成買進」補上股數，原紀錄會直接改成一筆買進（金額、日期不變），變成庫存明細裡的一批。</p>
-    ${items.length ? `<div class="list">${items.map(t => `<div class="row" style="cursor:default"><div class="body" style="flex:1;min-width:0"><div class="title">${what(t)}</div><small class="muted">${fmt(t)}${t.memo ? ' · ' + esc(t.memo) : ''}</small></div>
+  const pendRow = t => `<div class="row" style="cursor:default"><div class="body" style="flex:1;min-width:0"><div class="title">買進・待補股數</div><small class="muted">${fmt(t)}${t.memo ? ' · ' + esc(t.memo) : ''}</small></div>
+      <span class="num" style="margin-right:8px">${money(+t.amount, cur)}</span><button type="button" class="btn small" data-fill="${t.id}">填股數</button></div>`;
+  openSheet(`<div class="sheethead"><h2>待補股數 · ${esc(a.name)}</h2><button class="iconbtn" data-close aria-label="關閉">✕</button></div>
+    <p class="hint" style="margin:0 0 10px">下面的紀錄只有金額、沒有股數，補完之前庫存股數和成本均價不準。補的時候金額、日期都不變，只要填股數，成交價會自動算。</p>
+    ${pend.length ? `<div class="sectionhead"><h2>已記成買進，還沒填股數</h2><span class="hint">${pend.length} 筆</span></div><div class="list" style="margin-bottom:14px">${pend.map(pendRow).join('')}</div>` : ''}
+    ${items.length ? `<div class="sectionhead"><h2>未分配成本</h2><span class="hint">只轉了錢，還不是買進</span></div><div class="list">${items.map(t => `<div class="row" style="cursor:default"><div class="body" style="flex:1;min-width:0"><div class="title">${what(t)}</div><small class="muted">${fmt(t)}${t.memo ? ' · ' + esc(t.memo) : ''}</small></div>
       <span class="num" style="margin-right:8px">${money(deltaFor(t, id), cur, true)}</span>
       ${canBuy(t) ? `<button type="button" class="btn small" data-buy="${t.id}">改成買進</button>` : `<button type="button" class="btn small ghost" data-edit="${t.id}">編輯</button>`}</div>`).join('')}</div>
       ${items.some(t => !canBuy(t)) ? '<p class="hint">期初餘額等不是轉入的金額，沒辦法拆成單筆買進，可以用帳戶頁的「配股／補登股數」一次填目前股數。</p>' : ''}`
-    : '<div class="card empty">都補好了，沒有未分配的金額。</div>'}`, root => {
-    const byId = new Map(items.map(t => [t.id, t]));
+    : pend.length ? '' : '<div class="card empty">都補好了 ✔</div>'}`, root => {
+    const byId = new Map([...items, ...pend].map(t => [t.id, t]));
+    $$('[data-fill]', root).forEach(b => b.onclick = () => openForm({ tx: byId.get(+b.dataset.fill) }));
     $$('[data-buy]', root).forEach(b => b.onclick = () => openForm({ tx: byId.get(+b.dataset.buy), asBuy: true }));
     $$('[data-edit]', root).forEach(b => b.onclick = () => openForm({ tx: byId.get(+b.dataset.edit) }));
   });
@@ -1507,12 +1566,14 @@ async function openInvAccount(id) {
           <td>${l.pending ? '—' : qf.format(l.qty)}${Math.abs(l.qty - l.qty0) > 1e-9 ? `<br><small class="muted">原 ${qf.format(l.qty0)}</small>` : ''}</td>
           <td>${l.price != null ? qf.format(l.price) : '—'}</td><td>${money(l.cost, cur)}</td><td>${l.qty > 1e-9 ? money(l.cost / l.qty, cur) : '—'}</td></tr>`).join('');
         box.innerHTML = L.lots.length || L.pool || L.adj ? `<div class="tblwrap"><table class="tbl"><thead><tr><th>買進日</th><th>庫存股數</th><th>成交價</th><th>付出成本</th><th>每股成本</th></tr></thead>
-          <tbody>${rows}${L.pool ? `<tr class="pool" id="poolrow" style="cursor:pointer"><td colspan="3">未分配成本 ›<br><small class="muted">期初餘額、手動轉帳等沒有股數的金額，點這裡逐筆補成買進</small></td><td>${money(L.pool, cur)}</td><td></td></tr>` : ''}${L.adj ? `<tr class="pool"><td colspan="3">賣出成本差額<br><small class="muted">賣出時記的成本和先進先出明細不一致（用平均成本賣出，或之後改過買進）</small></td><td>${money(L.adj, cur)}</td><td><button type="button" class="btn small ghost" id="rebook">依先進先出重算</button></td></tr>` : ''}</tbody>
+          <tbody>${rows}${L.pool ? `<tr class="pool" id="poolrow" style="cursor:pointer"><td colspan="3">未分配成本 ›<br><small class="muted">只轉了錢、沒有股數的金額，點這裡補股數</small></td><td>${money(L.pool, cur)}</td><td></td></tr>` : ''}${L.adj ? `<tr class="pool"><td colspan="3">賣出成本差額<br><small class="muted">賣出時記的成本和先進先出明細不一致（用平均成本賣出，或之後改過買進）</small></td><td>${money(L.adj, cur)}</td><td><button type="button" class="btn small ghost" id="rebook">依先進先出重算</button></td></tr>` : ''}</tbody>
           <tfoot><tr><td>合計</td><td>${L.shares == null ? '—' : qf.format(L.shares)}</td><td></td><td>${money(L.total, cur)}</td><td>${L.shares > 0 ? money(L.total / L.shares, cur) : ''}</td></tr></tfoot></table></div>
           <div style="display:flex;justify-content:space-between;gap:8px;margin-top:8px;flex-wrap:wrap"><span></span>
           ${L.lots.some(l => l.qty <= 1e-9 && !l.pending) ? `<label class="toggle"><input type="checkbox" id="lotsall" ${showAll ? 'checked' : ''}> 顯示已賣完的批次</label>` : ''}</div>`
           : `<div class="card empty">還沒有買進明細。${L.total ? '這個帳戶的金額沒有股數，可以按「補登股數」記下現在的持股。' : '按「買進」記第一筆。'}</div>`;
-        if (nPend) box.insertAdjacentHTML('afterbegin', `<p class="hint" style="margin:0 0 8px"><strong class="exp">有 ${nPend} 筆買進還沒填股數</strong>（定期投資先記了金額），點那一列補上股數；補完前成本均價不準。</p>`);
+        if (nPend || L.pool) { box.insertAdjacentHTML('afterbegin', `<button type="button" class="card" id="pendbar" style="width:100%;text-align:left;margin:0 0 10px;padding:10px 14px;border:1px solid var(--exp);cursor:pointer;font:inherit;color:inherit;background:var(--surface)">
+            <strong class="exp">有金額還沒有股數</strong>・${[nPend && `${nPend} 筆買進待補股數`, L.pool && `未分配成本 ${money(L.pool, cur)}`].filter(Boolean).join('、')}<br><small class="muted">補完前成本均價不準。點這裡逐筆補 ›</small></button>`);
+          $('#pendbar', root).onclick = () => openPool(id); }
         const la = $('#lotsall', root); if (la) la.onchange = e => { S.lotsAll = e.target.checked; draw('lots'); };
         const pr = $('#poolrow', root); if (pr) pr.onclick = () => openPool(id);
         const rb = $('#rebook', root);
@@ -1907,35 +1968,43 @@ function reportHeader(P) {
         ? `<select id="pickp" aria-label="選擇年份">${Array.from({ length: new Date().getFullYear() + 1 - Math.min(S.firstYear || new Date().getFullYear(), P.m.getFullYear()) }, (_, i) => new Date().getFullYear() - i).map(y => `<option value="${y}" ${y === P.m.getFullYear() ? 'selected' : ''}>${y} 年</option>`).join('')}</select>`
         : `<input type="month" id="pickp" aria-label="選擇月份" value="${P.m.getFullYear()}-${pad(P.m.getMonth() + 1)}">`}</label>
       <button id="next" aria-label="下一期">›</button></div>
-    <div class="seg" role="group" style="margin-top:8px"><button data-p="month" aria-pressed="${!P.yearMode}">月</button><button data-p="year" aria-pressed="${P.yearMode}">年</button></div></div>`;
+    <div style="display:flex;gap:8px;margin-top:8px;align-items:stretch"><div class="seg" role="group" style="flex:1"><button data-p="month" aria-pressed="${!P.yearMode}">月</button><button data-p="year" aria-pressed="${P.yearMode}">年</button></div>
+      ${repCurs().length > 1 ? `<select id="rcsel" class="cursel ${repCur() !== 'TWD' ? 'fx' : ''}" aria-label="幣別">${repCurs().map(c => `<option value="${c}" ${repCur() === c ? 'selected' : ''}>${c}</option>`).join('')}</select>` : ''}</div></div>`;
 }
+// 報表幣別：有外幣帳戶時可切換，只看該幣別帳戶的收支（原幣金額，不換匯）
+const repCurs = () => { const set = new Set(S.accts.map(a => a.currency || 'TWD')); return ['TWD', ...[...set].filter(c => c !== 'TWD').sort()].filter(c => set.has(c) || c === 'TWD'); };
+const repCur = () => repCurs().includes(S.rcur) ? S.rcur : 'TWD';
 function bindReportHeader(P) {
   const v = $('#view');
   $$('[data-rv]', v).forEach(b => b.onclick = () => { S.rv = b.dataset.rv; viewReport(); });
   $$('[data-p]', v).forEach(b => b.onclick = () => { S.rp = b.dataset.p; viewReport(); });
+  const rc = $('#rcsel', v); if (rc) rc.onchange = () => { S.rcur = rc.value; LS.set('repCur', S.rcur); viewReport(); };
   $('#prev').onclick = () => { S.month = P.yearMode ? new Date(P.m.getFullYear() - 1, P.m.getMonth(), 1) : addMonths(P.m, -1); viewReport(); };
   $('#next').onclick = () => { S.month = P.yearMode ? new Date(P.m.getFullYear() + 1, P.m.getMonth(), 1) : addMonths(P.m, 1); viewReport(); };
   const pk = $('#pickp');
   pk.onchange = () => { const x = pk.value; if (!x) return;
     S.month = P.yearMode ? new Date(+x, P.m.getMonth(), 1) : new Date(+x.slice(0, 4), +x.slice(5, 7) - 1, 1); viewReport(); };
 }
-async function viewReport() { return S.rv === 'inv' ? viewInvReport() : viewPL(); }
+async function viewReport() { S.rcur ??= LS.get('repCur', 'TWD'); return S.rv === 'inv' ? viewInvReport() : viewPL(); }
+// 投資類收支：分類勾了「計入投資收支」，或是連到投資帳戶的配息（損益表和投資收支共用這個判斷）
+const isInvTx = t => !!S.catMap.get(t.category_id)?.is_investment || (t.kind === 'income' && isInv(acct(t.to_account_id)));
 async function viewPL() {
-  const v = $('#view'), L = S.ledger.id, P = periodOf(), { pStart, pEnd, tStart, tEnd, yearMode } = P;
+  const v = $('#view'), L = S.ledger.id, cur = repCur(), P = periodOf(), { pStart, pEnd, tStart, tEnd, yearMode } = P;
   v.innerHTML = `${reportHeader(P)}
     <div class="card" id="stmt"><div class="spinner">計算中…</div></div>
-    <div class="sectionhead"><h2>${yearMode ? '各月收支' : '近 12 個月收支'}</h2><span class="hint">台幣帳戶</span></div>
+    <div class="sectionhead"><h2>${yearMode ? '各月生活收支' : '近 12 個月生活收支'}</h2><span class="hint">${cur} 帳戶・不含投資</span></div>
     <div class="card" id="trend"><div class="spinner">計算中…</div></div>`;
   bindReportHeader(P);
   const [rows, sells] = await Promise.all([
-    fetchAll(() => sb.from('transactions').select('kind,occurred_at,account_id,amount,category_id').eq('ledger_id', L)
+    fetchAll(() => sb.from('transactions').select('kind,occurred_at,account_id,to_account_id,amount,category_id').eq('ledger_id', L)
       .in('kind', ['expense', 'income']).gte('occurred_at', tStart.toISOString()).lt('occurred_at', tEnd.toISOString()).order('id')),
     fetchAll(() => sb.from('transactions').select('occurred_at,account_id,amount,to_amount').eq('ledger_id', L)
       .eq('trade_side', 'sell').gte('occurred_at', tStart.toISOString()).lt('occurred_at', tEnd.toISOString()).order('id')),
   ]);
-  const tw = id => (acct(id)?.currency || 'TWD') === 'TWD';
+  const tw = id => (acct(id)?.currency || 'TWD') === cur;
   const inP = t => { const d = new Date(t.occurred_at); return d >= pStart && d < pEnd; };
-  const pRows = rows.filter(t => tw(t.account_id) && inP(t));
+  const pAll = rows.filter(t => tw(t.account_id) && inP(t));
+  const pRows = pAll.filter(t => !isInvTx(t)), pInv = pAll.filter(isInvTx);
   const realized = sells.filter(t => tw(t.account_id) && inP(t)).reduce((s, t) => s + ((t.to_amount ?? t.amount) - t.amount), 0);
   // 依第一層分類加總，保留子分類明細
   const tree = kind => {
@@ -1951,36 +2020,38 @@ async function viewPL() {
   };
   const inc = tree('income'), exp = tree('expense');
   const incTot = inc.reduce((s, x) => s + x[1].sum, 0), expTot = exp.reduce((s, x) => s + x[1].sum, 0);
-  const net = incTot + realized - expTot;
-  const block = (list, cls) => list.map(([name, e]) => `<div class="st-r"><span>${esc(name)}</span><span class="num ${cls}">${money(e.sum)}</span></div>
-    ${[...e.kids].sort((a, b) => b[1] - a[1]).map(([k, x]) => `<div class="st-r st-sub"><span>${esc(k)}</span><span class="num">${money(x)}</span></div>`).join('')}`).join('');
+  const invNet = pInv.reduce((s, t) => s + (t.kind === 'income' ? +t.amount : -t.amount), 0) + realized;
+  const life = incTot - expTot, net = life + invNet;
+  const block = (list, cls) => list.map(([name, e]) => `<div class="st-r"><span>${esc(name)}</span><span class="num ${cls}">${money(e.sum, cur)}</span></div>
+    ${[...e.kids].sort((a, b) => b[1] - a[1]).map(([k, x]) => `<div class="st-r st-sub"><span>${esc(k)}</span><span class="num">${money(x, cur)}</span></div>`).join('')}`).join('');
   $('#stmt').innerHTML = `<div class="stmt">
-    <div class="st-h">收入</div>${block(inc, '') || '<div class="st-r st-sub"><span>（無）</span><span></span></div>'}
-    <div class="st-t"><span>收入合計</span><span class="num inc">${money(incTot)}</span></div>
-    <div class="st-h">投資</div>
-    <div class="st-r"><span>已實現損益</span><span class="num ${realized >= 0 ? 'inc' : 'exp'}">${money(realized, 'TWD', true)}</span></div>
-    <div class="st-h">支出</div>${block(exp, '') || '<div class="st-r st-sub"><span>（無）</span><span></span></div>'}
-    <div class="st-t"><span>支出合計</span><span class="num exp">${money(expTot)}</span></div>
-    <div class="st-net"><span>本期淨利</span><span class="num ${net >= 0 ? 'inc' : 'exp'}">${money(net, 'TWD', true)}</span></div>
-  </div>`;
+    <div class="st-h">生活收入</div>${block(inc, '') || '<div class="st-r st-sub"><span>（無）</span><span></span></div>'}
+    <div class="st-t"><span>生活收入合計</span><span class="num inc">${money(incTot, cur)}</span></div>
+    <div class="st-h">生活支出</div>${block(exp, '') || '<div class="st-r st-sub"><span>（無）</span><span></span></div>'}
+    <div class="st-t"><span>生活支出合計</span><span class="num exp">${money(expTot, cur)}</span></div>
+    <div class="st-t" style="border-top:1px solid var(--line);margin-top:6px;padding-top:10px"><span>生活結餘</span><span class="num ${life >= 0 ? 'inc' : 'exp'}">${money(life, cur, true)}</span></div>
+    <button type="button" class="st-r" id="toinv" style="width:100%;background:none;border:0;padding:6px 0;font:inherit;color:inherit;cursor:pointer;text-align:left"><span>投資淨收益 <span class="muted">›</span></span><span class="num ${invNet >= 0 ? 'inc' : 'exp'}">${money(invNet, cur, true)}</span></button>
+    <div class="st-net"><span>本期淨利</span><span class="num ${net >= 0 ? 'inc' : 'exp'}">${money(net, cur, true)}</span></div>
+  </div>
+  <p class="hint" style="margin:10px 0 0">投資類（勾了「計入投資收支」的分類、連到個股的配息、買賣損益）只算在「投資淨收益」，明細在投資收支頁，兩邊數字相同。</p>`;
+  $('#toinv').onclick = () => { S.rv = 'inv'; viewReport(); };
   const months = P.months;
   // 收支趨勢
   const agg = months.map(mm => { const n = addMonths(mm, 1), r = { e: 0, i: 0 }, w = t => { const d = new Date(t.occurred_at); return d >= mm && d < n; };
-    for (const t of rows) if (tw(t.account_id) && w(t)) r[t.kind === 'expense' ? 'e' : 'i'] += +t.amount;
-    for (const t of sells) if (tw(t.account_id) && w(t)) r.i += (t.to_amount ?? t.amount) - t.amount;
+    for (const t of rows) if (tw(t.account_id) && w(t) && !isInvTx(t)) r[t.kind === 'expense' ? 'e' : 'i'] += +t.amount;
     return r; });
-  const svg = barChart(months, [{ vals: agg.map(a => a.e), color: 'var(--exp)', name: '支出' }, { vals: agg.map(a => a.i), color: 'var(--inc)', name: '收入' }]);
-  $('#trend').innerHTML = `<div style="overflow-x:auto">${svg}</div><div class="extra"><span class="exp">■</span> 支出　<span class="inc">■</span> 收入（含已實現投資損益）</div>`;
+  const svg = barChart(months, cur, [{ vals: agg.map(a => a.e), color: 'var(--exp)', name: '支出' }, { vals: agg.map(a => a.i), color: 'var(--inc)', name: '收入' }]);
+  $('#trend').innerHTML = `<div style="overflow-x:auto">${svg}</div><div class="extra"><span class="exp">■</span> 生活支出　<span class="inc">■</span> 生活收入</div>`;
 }
 
 // 投資收支：投資帳戶上「計入投資」分類的收入／支出 + 買賣已實現損益；投入／取回另列
 async function viewInvReport() {
-  const v = $('#view'), L = S.ledger.id, P = periodOf(), { pStart, pEnd, tStart, tEnd, months } = P;
+  const v = $('#view'), L = S.ledger.id, cur = repCur(), P = periodOf(), { pStart, pEnd, tStart, tEnd, months } = P;
   v.innerHTML = `${reportHeader(P)}
     <div class="card" id="invsum2"><div class="spinner">計算中…</div></div>
     <div class="sectionhead"><h2>依帳戶</h2><span class="hint">個股或入帳帳戶</span></div><div id="invacc"></div>
-    <div class="sectionhead"><h2>每月投資收益</h2><span class="hint">台幣帳戶</span></div><div class="card" id="invtrend"></div>
-    <div class="sectionhead"><h2>資金投入</h2></div><div class="card" id="invflow"></div>
+    <div class="sectionhead"><h2>每月投資收益</h2><span class="hint">${cur} 帳戶</span></div><div class="card" id="invtrend"></div>
+    <div class="sectionhead"><h2>投入本金</h2><span class="hint">把錢移進投資帳戶，不是損益</span></div><div class="card" id="invflow"></div>
     <div id="invother"></div>`;
   bindReportHeader(P);
   const invIds = S.accts.filter(isInv).map(a => a.id), invCatIds = S.cats.filter(c => c.is_investment).map(c => c.id);
@@ -1992,7 +2063,7 @@ async function viewInvReport() {
     !invIds.length ? [] : fetchAll(() => range(sb.from('transactions').select('occurred_at,account_id,to_account_id,amount,to_amount').eq('ledger_id', L).eq('kind', 'transfer')
       .or(`account_id.in.(${invIds}),to_account_id.in.(${invIds})`))),
   ]);
-  const tw = id => (acct(id)?.currency || 'TWD') === 'TWD';
+  const tw = id => (acct(id)?.currency || 'TWD') === cur;
   const inP = t => { const d = new Date(t.occurred_at); return d >= pStart && d < pEnd; };
   const mIdx = t => { const d = new Date(t.occurred_at); return months.findIndex(mm => d >= mm && d < addMonths(mm, 1)); };
   const isInvCat = id => !!S.catMap.get(id)?.is_investment;
@@ -2004,7 +2075,7 @@ async function viewInvReport() {
   for (const t of ie) {
     if (!tw(t.account_id)) continue;
     const v = +t.amount, mi = mIdx(t), linked = t.kind === 'income' && isInv(acct(t.to_account_id));
-    if (!linked && !isInvCat(t.category_id)) { if (inP(t)) { const k = `${t.kind === 'income' ? '收入' : '支出'}｜${cName(t.category_id)}`; const e = other.get(k) || { v: 0, n: 0 }; e.v += v; e.n++; other.set(k, e); } continue; }
+    if (!isInvTx(t)) { if (inP(t)) { const k = `${t.kind === 'income' ? '收入' : '支出'}｜${cName(t.category_id)}`; const e = other.get(k) || { v: 0, n: 0 }; e.v += v; e.n++; other.set(k, e); } continue; }
     if (mi >= 0) trend[mi][t.kind === 'income' ? 'g' : 'l'] += v;
     if (!inP(t)) continue;
     const m = cats[t.kind]; m.set(t.category_id, (m.get(t.category_id) || 0) + v);
@@ -2020,48 +2091,48 @@ async function viewInvReport() {
   }
   const incTot = [...cats.income.values()].reduce((s, x) => s + x, 0), expTot = [...cats.expense.values()].reduce((s, x) => s + x, 0);
   const net = incTot - expTot + realized;
-  const catRows = (m, cls) => [...m].sort((a, b) => b[1] - a[1]).map(([id, x]) => `<div class="st-r st-sub"><span>${esc(cName(id))}</span><span class="num ${cls}">${money(x)}</span></div>`).join('');
+  const catRows = (m, cls) => [...m].sort((a, b) => b[1] - a[1]).map(([id, x]) => `<div class="st-r st-sub"><span>${esc(cName(id))}</span><span class="num ${cls}">${money(x, cur)}</span></div>`).join('');
   $('#invsum2').innerHTML = `<div class="stmt">
     <div class="st-h">投資收入</div>${catRows(cats.income, '') || '<div class="st-r st-sub"><span>（無）</span><span></span></div>'}
-    <div class="st-t"><span>收入合計</span><span class="num inc">${money(incTot)}</span></div>
-    <div class="st-h">買賣</div><div class="st-r"><span>已實現損益（用「投資」分頁記的賣出）</span><span class="num ${realized >= 0 ? 'inc' : 'exp'}">${money(realized, 'TWD', true)}</span></div>
+    <div class="st-t"><span>收入合計</span><span class="num inc">${money(incTot, cur)}</span></div>
+    <div class="st-h">買賣</div><div class="st-r"><span>已實現損益（用「投資」分頁記的賣出）</span><span class="num ${realized >= 0 ? 'inc' : 'exp'}">${money(realized, cur, true)}</span></div>
     <div class="st-h">投資支出</div>${catRows(cats.expense, '') || '<div class="st-r st-sub"><span>（無）</span><span></span></div>'}
-    <div class="st-t"><span>支出合計</span><span class="num exp">${money(expTot)}</span></div>
-    <div class="st-net"><span>投資淨收益</span><span class="num ${net >= 0 ? 'inc' : 'exp'}">${money(net, 'TWD', true)}</span></div></div>
+    <div class="st-t"><span>支出合計</span><span class="num exp">${money(expTot, cur)}</span></div>
+    <div class="st-net"><span>投資淨收益</span><span class="num ${net >= 0 ? 'inc' : 'exp'}">${money(net, cur, true)}</span></div></div>
     <p class="hint" style="margin:10px 0 0">計入的是「計入投資收支」的分類（不管記在哪個帳戶）、連到個股的配息，以及「投資」分頁記的賣出損益。</p>`;
   // 依帳戶
   const accRows = [...byAcc].map(([id, e]) => [id, e, e.inc - e.exp + e.real]).sort((a, b) => b[2] - a[2]);
   $('#invacc').innerHTML = accRows.length ? `<div class="list">${accRows.map(([id, e, n]) => `<button class="row" data-acct="${id}"><span class="main"><span class="t">${esc(acct(id).name)}</span>
-      <span class="s">${[e.inc ? '收入 ' + money(e.inc) : '', e.exp ? '支出 ' + money(e.exp) : '', e.real ? '買賣 ' + money(e.real, 'TWD', true) : ''].filter(Boolean).join('・')}</span></span>
-      <span class="amt num ${n >= 0 ? 'inc' : 'exp'}">${money(n, 'TWD', true)}</span></button>`).join('')}</div>` : '<div class="card empty">這段期間投資帳戶沒有收支。</div>';
+      <span class="s">${[e.inc ? '收入 ' + money(e.inc, cur) : '', e.exp ? '支出 ' + money(e.exp, cur) : '', e.real ? '買賣 ' + money(e.real, cur, true) : ''].filter(Boolean).join('・')}</span></span>
+      <span class="amt num ${n >= 0 ? 'inc' : 'exp'}">${money(n, cur, true)}</span></button>`).join('')}</div>` : '<div class="card empty">這段期間投資帳戶沒有收支。</div>';
   $$('#invacc [data-acct]').forEach(b => b.onclick = () => openAccount(+b.dataset.acct));
   // 每月收益
   const netByM = trend.map(x => x.g - x.l), doneM = months.filter(mm => mm <= new Date()).length || 1;
-  $('#invtrend').innerHTML = `<div style="overflow-x:auto">${barChart(months, [{ vals: trend.map(x => x.g), color: 'var(--inc)', name: '收益' }, { vals: trend.map(x => x.l), color: 'var(--exp)', name: '虧損與費用' }])}</div>
-    <div class="extra"><span class="inc">■</span> 收益（股利、利息、獲利）　<span class="exp">■</span> 虧損與費用・${doneM} 個月合計淨收益 <span class="num ${netByM.reduce((s, x) => s + x, 0) >= 0 ? 'inc' : 'exp'}">${money(netByM.reduce((s, x) => s + x, 0), 'TWD', true)}</span></div>`;
+  $('#invtrend').innerHTML = `<div style="overflow-x:auto">${barChart(months, cur, [{ vals: trend.map(x => x.g), color: 'var(--inc)', name: '收益' }, { vals: trend.map(x => x.l), color: 'var(--exp)', name: '虧損與費用' }])}</div>
+    <div class="extra"><span class="inc">■</span> 收益（股利、利息、獲利）　<span class="exp">■</span> 虧損與費用・${doneM} 個月合計淨收益 <span class="num ${netByM.reduce((s, x) => s + x, 0) >= 0 ? 'inc' : 'exp'}">${money(netByM.reduce((s, x) => s + x, 0), cur, true)}</span></div>`;
   // 資金投入：非投資帳戶 → 投資帳戶算投入；反向算取回；投資帳戶之間互轉不算
   const flow = months.map(() => ({ in: 0, out: 0 })), inAcc = new Map(); let pIn = 0, pOut = 0;
   for (const t of moves) {
     const A = acct(t.account_id), B = acct(t.to_account_id), mi = mIdx(t), val = +(t.to_amount ?? t.amount);
-    if (isInv(B) && !isInv(A) && B.currency === 'TWD') {
+    if (isInv(B) && !isInv(A) && B.currency === cur) {
       if (mi >= 0) flow[mi].in += val;
       if (inP(t)) { pIn += val; const e = inAcc.get(B.id) || { v: 0, n: 0 }; e.v += val; e.n++; inAcc.set(B.id, e); }
-    } else if (isInv(A) && !isInv(B) && A.currency === 'TWD') { if (mi >= 0) flow[mi].out += val; if (inP(t)) pOut += val; }
+    } else if (isInv(A) && !isInv(B) && A.currency === cur) { if (mi >= 0) flow[mi].out += val; if (inP(t)) pOut += val; }
   }
   const avgIn = flow.reduce((s, x) => s + x.in, 0) / doneM;
   $('#invflow').innerHTML = `<div class="summary">
-      <div><small>投入</small><span class="num" style="color:var(--accent)">${money(pIn)}</span></div>
-      <div><small>取回</small><span class="num">${money(pOut)}</span></div>
-      <div><small>淨投入</small><span class="num">${money(pIn - pOut, 'TWD', true)}</span></div></div>
-    ${inAcc.size ? `<div class="stmt" style="margin-top:12px">${[...inAcc].sort((x, y) => y[1].v - x[1].v).map(([id, e]) => `<div class="st-r st-sub" style="padding-left:0"><span>${esc(acct(id).name)}<span class="muted">・${e.n} 筆</span></span><span class="num">${money(e.v)}</span></div>`).join('')}</div>` : '<p class="hint" style="margin:10px 0 0">這段期間沒有投入。</p>'}
-    <div style="overflow-x:auto;margin-top:12px">${barChart(months, [{ vals: flow.map(x => x.in), color: 'var(--accent)', name: '投入' }, { vals: flow.map(x => x.out), color: 'var(--muted)', name: '取回' }])}</div>
-    <div class="extra"><span style="color:var(--accent)">■</span> 投入　<span class="muted">■</span> 取回・平均每月投入 <span class="num">${money(Math.round(avgIn))}</span>（${doneM} 個月）</div>`;
+      <div><small>投入</small><span class="num" style="color:var(--accent)">${money(pIn, cur)}</span></div>
+      <div><small>取回</small><span class="num">${money(pOut, cur)}</span></div>
+      <div><small>淨投入</small><span class="num">${money(pIn - pOut, cur, true)}</span></div></div>
+    ${inAcc.size ? `<div class="stmt" style="margin-top:12px">${[...inAcc].sort((x, y) => y[1].v - x[1].v).map(([id, e]) => `<div class="st-r st-sub" style="padding-left:0"><span>${esc(acct(id).name)}<span class="muted">・${e.n} 筆</span></span><span class="num">${money(e.v, cur)}</span></div>`).join('')}</div>` : '<p class="hint" style="margin:10px 0 0">這段期間沒有投入。</p>'}
+    <div style="overflow-x:auto;margin-top:12px">${barChart(months, cur, [{ vals: flow.map(x => x.in), color: 'var(--accent)', name: '投入' }, { vals: flow.map(x => x.out), color: 'var(--muted)', name: '取回' }])}</div>
+    <div class="extra"><span style="color:var(--accent)">■</span> 投入　<span class="muted">■</span> 取回・平均每月投入 <span class="num">${money(Math.round(avgIn), cur)}</span>（${doneM} 個月）</div>`;
   // 未計入
   $('#invother').innerHTML = other.size ? `<details class="card" style="padding:12px 16px"><summary style="cursor:pointer"><strong>投資帳戶上的其他收支（未計入）</strong>・${[...other.values()].reduce((s, e) => s + e.n, 0)} 筆</summary>
       <p class="hint" style="margin:8px 0">這些記在投資帳戶，但分類不算投資，所以不計入上面的收益。要計入的話，到「設定 › 管理分類」把該分類勾選「計入投資收支報表」。</p>
-      <div class="stmt">${[...other].sort((a, b) => b[1].v - a[1].v).map(([k, e]) => `<div class="st-r st-sub" style="padding-left:0"><span>${esc(k)}<span class="muted">・${e.n} 筆</span></span><span class="num">${money(e.v)}</span></div>`).join('')}</div></details>` : '';
+      <div class="stmt">${[...other].sort((a, b) => b[1].v - a[1].v).map(([k, e]) => `<div class="st-r st-sub" style="padding-left:0"><span>${esc(k)}<span class="muted">・${e.n} 筆</span></span><span class="num">${money(e.v, cur)}</span></div>`).join('')}</div></details>` : '';
 }
-function barChart(months, series) {
+function barChart(months, cur, series) {
   const top = Math.max(1, ...series.flatMap(x => x.vals));
   const step = niceStep(top / 4), yMax = Math.ceil(top / step) * step;
   const W = 600, H = 200, pl = 48, pb = 24, pt = 10, cw = (W - pl - 8) / months.length, y = v => pt + (H - pt - pb) * (1 - Math.max(0, v) / yMax);
@@ -2070,7 +2141,7 @@ function barChart(months, series) {
   for (let g = 0; g <= yMax + 1e-9; g += step) svg += `<line x1="${pl}" x2="${W - 4}" y1="${y(g)}" y2="${y(g)}" stroke="var(--line)" stroke-width="1"/><text x="${pl - 6}" y="${y(g) + 4}" text-anchor="end">${g >= 1000 ? nf.format(g / 1000) + 'k' : g}</text>`;
   months.forEach((mm, i) => {
     series.forEach((sr, k) => { const v = sr.vals[i], x = pl + i * cw + cw * 0.15 + k * (bw + 1);
-      if (v > 0) svg += `<rect x="${x}" y="${y(v)}" width="${bw}" height="${y(0) - y(v)}" rx="2" fill="${sr.color}"><title>${mm.getFullYear()}/${mm.getMonth() + 1} ${sr.name} ${money(v)}</title></rect>`; });
+      if (v > 0) svg += `<rect x="${x}" y="${y(v)}" width="${bw}" height="${y(0) - y(v)}" rx="2" fill="${sr.color}"><title>${mm.getFullYear()}/${mm.getMonth() + 1} ${sr.name} ${money(v, cur)}</title></rect>`; });
     svg += `<text x="${pl + i * cw + cw / 2}" y="${H - 6}" text-anchor="middle">${mm.getMonth() + 1}月</text>`;
   });
   return svg + '</svg>';
@@ -2320,7 +2391,7 @@ function openForm({ mode, tx, loanType: lt0, cpId, accountId, side, invId, invLi
       const a = 'a:' + A.id, c = 'c:' + tx.category_id;
       Object.assign(st, { mode: 'journal', amount: -tx.amount, dr: tx.kind === 'expense' ? a : c, cr: tx.kind === 'expense' ? c : a });
     }
-    else if ((tx.kind === 'expense' || tx.kind === 'income') && /^當沖/.test(tx.memo || '') && S.catMap.get(tx.category_id)?.is_investment && !isInv(A)) {
+    else if ((tx.kind === 'expense' || tx.kind === 'income') && tx.day_trade) {
       const rest = (tx.memo || '').replace(/^當沖\s*/, '');
       Object.assign(st, { mode: 'invest', side: 'day', dayPL: tx.kind === 'expense' ? 'loss' : 'gain', cash: A.id, amount: tx.amount, stock: rest, memo: '' });
     }
@@ -2595,8 +2666,14 @@ function openForm({ mode, tx, loanType: lt0, cpId, accountId, side, invId, invLi
     const del = g('fdel');
     if (del) del.onclick = async () => {
       if (!del.dataset.armed) { del.dataset.armed = 1; del.textContent = tx.split_id ? '再按一次刪除整組分攤' : '再按一次刪除'; setTimeout(() => { if (del.isConnected) { delete del.dataset.armed; del.textContent = '刪除'; } }, 3000); return; }
+      // 先留一份，刪除後幾秒內可以復原（重新寫回，id 會換新）
+      const keep = tx.split_id ? (await sb.from('transactions').select('*').eq('split_id', tx.split_id)).data : (await sb.from('transactions').select('*').eq('id', tx.id)).data;
       const { error } = tx.split_id ? await sb.from('transactions').delete().eq('split_id', tx.split_id) : await sb.from('transactions').delete().eq('id', tx.id);
-      if (error) return fail(error); await reloadAll(); closeSheet(); toast('已刪除');
+      if (error) return fail(error); await reloadAll(); closeSheet();
+      toast(tx.split_id ? '已刪除整組分攤' : '已刪除', 7000, keep?.length ? { label: '復原', run: async () => {
+        const rows = keep.map(({ id: _i, post_date: _p, created_at: _c, ...r }) => r);
+        const { error: e2 } = await sb.from('transactions').insert(rows); if (e2) return fail(e2);
+        await reloadAll(); toast('已復原'); } } : null);
     };
     const save = async () => {
       grab();
@@ -2654,7 +2731,7 @@ function openForm({ mode, tx, loanType: lt0, cpId, accountId, side, invId, invLi
           const v = num(st.amount); if (!(v > 0)) return err(`請輸入淨${st.dayPL === 'loss' ? '虧損' : '獲利'}金額。`);
           if (!acct(+st.cash)) return err('請選交割帳戶。');
           const kind = st.dayPL === 'loss' ? 'expense' : 'income';
-          Object.assign(row, { kind, account_id: +st.cash, to_account_id: null, to_amount: null, amount: v, category_id: await dayCategory(kind), counterparty_id: null,
+          Object.assign(row, { kind, account_id: +st.cash, to_account_id: null, to_amount: null, amount: v, category_id: await dayCategory(kind), counterparty_id: null, day_trade: true,
             memo: ['當沖', st.stock.trim(), st.memo.trim()].filter(Boolean).join(' ') });
         } else if (st.mode === 'invest') {
           const c = calcInv(), q = num(st.qty), pr = num(st.price);
@@ -2692,6 +2769,7 @@ function openForm({ mode, tx, loanType: lt0, cpId, accountId, side, invId, invLi
           Object.assign(row, { amount: amt });
         }
         if ((st.mode !== 'invest' || st.side === 'day') && st.mode !== 'other') Object.assign(row, { quantity: null, unit_price: null, fee: null, tax: null, trade_side: null });
+        if (!(st.mode === 'invest' && st.side === 'day') && st.mode !== 'other') row.day_trade = false;
         if (st.mode !== 'other') row.posted_on = cardIn() && st.posted && st.posted !== st.when ? st.posted : null;
         let r;
         if (tx?.split_id) {   // 原本是分攤，改成一般紀錄：整組換成這一筆
