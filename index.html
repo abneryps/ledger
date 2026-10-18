@@ -214,7 +214,22 @@ body.sorting{user-select:none;-webkit-user-select:none;cursor:grabbing}
 .pielg .pa{font-family:var(--f-num);color:var(--muted);font-size:13px;min-width:5.5em;text-align:right}
 .pielg .kids{padding:0 6px 6px 26px;font-size:13px;color:var(--muted)}
 .pielg .kids div{display:flex;justify-content:space-between;gap:8px;padding:2px 0}
+/* 設定頁 */
+.setlist{display:flex;flex-direction:column;gap:16px}
+.setgrp h3{margin:0 4px 6px;font-size:12.5px;font-weight:500;color:var(--muted);letter-spacing:.06em}
+.setcard{background:var(--bg);border-radius:14px;overflow:hidden}
+.setrow{display:flex;align-items:center;gap:12px;width:100%;border:0;background:none;padding:12px 14px;text-align:left;font:inherit;color:var(--ink);cursor:pointer}
+.setrow+.setrow{border-top:1px solid var(--line)}
+.setrow:hover{background:var(--accent-soft)}
+.setrow svg{width:22px;height:22px;flex:none;color:var(--accent)}
+.setx{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.sett{font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.setd{font-size:12.5px;color:var(--muted)}
+.setgo{color:var(--muted);font-size:20px;line-height:1}
+.setfoot{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 4px;flex-wrap:wrap}
 /* 常用摘要 */
+.deskonly-btn{display:none!important}
+@media (min-width:1024px){.deskonly-btn{display:flex!important}}
 .memochips{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
 .tplchip{border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit;font-size:13.5px;padding:5px 12px;border-radius:999px;cursor:pointer}
 .tplchip:hover{border-color:var(--accent);color:var(--accent)}
@@ -847,20 +862,41 @@ function openPrefs() {
     });
   });
 }
+// 設定頁：分組清單，每一項有圖示、名稱、一行說明
+const SET_ICON = {
+  book: '<path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/>',
+  wallet: '<rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10h18M16 15h2"/>',
+  tag: '<path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.3"/>',
+  folder: '<path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/>',
+  user: '<circle cx="12" cy="8" r="3.5"/><path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5"/>',
+  star: '<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/>',
+  repeat: '<path d="M4 11V9a3 3 0 0 1 3-3h12l-3-3M20 13v2a3 3 0 0 1-3 3H5l3 3"/>',
+  chat: '<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/>',
+  download: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
+  refresh: '<path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/>',
+};
+const setGroup = (title, items) => `<div class="setgrp"><h3>${title}</h3><div class="setcard">${items.map(([id, ic, name, desc, cls]) =>
+  `<button type="button" class="setrow ${cls || ''}" id="${id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${SET_ICON[ic]}</svg>
+    <span class="setx"><span class="sett">${esc(name)}</span><span class="setd">${esc(desc)}</span></span><span class="setgo" aria-hidden="true">›</span></button>`).join('')}</div></div>`;
 function openMe() {
   asPage('me', openMe);
   openSheet(`
     <div class="sheethead"><h2>設定</h2><button class="iconbtn" data-close aria-label="關閉">✕</button></div>
-    <div class="form">
-      <p class="hint">登入身分：${esc(S.user.email)}</p>
-      <button class="btn ghost" id="mLedger" style="justify-content:space-between;display:flex"><span>帳本：<strong>${esc(S.ledger.name)}</strong></span><span>${S.ledgers.length > 1 ? `共 ${S.ledgers.length} 本 ` : ''}›</span></button>
-      <div class="two"><button class="btn ghost" id="mAccts">管理帳戶</button><button class="btn ghost" id="mCats">管理分類</button></div>
-      <div class="two"><button class="btn ghost" id="mProj">專案</button><button class="btn ghost" id="mPayee">收付人</button></div>
-      <button class="btn ghost" id="mPrefs">記帳預設（帳戶、分類）</button>
-      <button class="btn ghost" id="mRecur">定期紀錄（支出、收入、投資）</button>
-      <div class="two"><button class="btn ghost" id="mMemos">常用摘要</button><button class="btn ghost" id="mExport">匯出全部紀錄（CSV）</button></div>
-      <button class="btn ghost" id="reload">重新整理資料</button>
-      <button class="btn danger" id="logout">${DEMO ? '離開預覽' : '登出'}</button>
+    <div class="setlist">
+      ${setGroup('帳本', [['mLedger', 'book', S.ledger.name, S.ledgers.length > 1 ? `共 ${S.ledgers.length} 本，可以切換、新增或分享` : '切換、新增或分享帳本']])}
+      ${setGroup('基本資料', [
+        ['mAccts', 'wallet', '帳戶', '現金、銀行、信用卡、投資等，調整順序或隱藏'],
+        ['mCats', 'tag', '分類', '支出與收入的分類，新增、改名或排序'],
+        ['mProj', 'folder', '專案', '旅行、裝潢等專款，統計各自花了多少'],
+        ['mPayee', 'user', '收付人', '店家、房東等收付款的對象']])}
+      ${setGroup('記帳輔助', [
+        ['mPrefs', 'star', '記帳預設', '記一筆時預先帶入的帳戶和分類'],
+        ['mRecur', 'repeat', '定期紀錄', '房租、薪水、定期定額，到期提醒你確認'],
+        ['mMemos', 'chat', '常用摘要', '每個分類常用的備註，記帳時一點就帶入']])}
+      ${setGroup('資料', [
+        ['mExport', 'download', '匯出紀錄（CSV）', '選擇期間，下載成 Excel 可以開的檔案', 'deskonly-btn'],
+        ['reload', 'refresh', '重新整理資料', '在別的裝置記了帳，這裡沒看到時使用']])}
+      <div class="setfoot"><span class="hint">登入身分：${esc(S.user.email)}</span><button class="btn small danger" id="logout">${DEMO ? '離開預覽' : '登出'}</button></div>
     </div>`, root => {
     $('#mAccts', root).onclick = () => manageAccounts();
     $('#mCats', root).onclick = () => manageCats();
@@ -870,7 +906,7 @@ function openMe() {
     $('#mLedger', root).onclick = () => openLedgers();
     $('#mRecur', root).onclick = () => openRecurList();
     $('#mMemos', root).onclick = () => openMemos();
-    $('#mExport', root).onclick = () => exportAll($('#mExport', root));
+    $('#mExport', root).onclick = () => openExport();
     $('#reload', root).onclick = async () => { closeAllSheets(); await reloadAll(); toast('已更新'); };
     $('#logout', root).onclick = async () => { closeAllSheets(); await sb.auth.signOut(); };
   });
@@ -1449,13 +1485,10 @@ async function viewFlow() {
   if (!txs.length) { box.innerHTML = `<div class="card empty">${S.q || S.ft.length ? '找不到符合的紀錄。' : rangeMode ? '這段期間沒有紀錄。' : '這個月還沒有紀錄。按下方「記一筆」開始。'}</div>`; return; }
   const showYear = S.q || (rangeMode && new Date(txs[0].occurred_at).getFullYear() !== new Date(txs[txs.length - 1].occurred_at).getFullYear());
   S.flowTxs = new Map(txs.map(t => [t.id, t]));
-  const expLabel = (() => { const [f, t] = rangeMode ? rangeOf(S.fr) : [S.month, addMonths(S.month, 1)];
-    const per = S.q && !rangeMode ? 'search' : rangeMode ? `${f ? ymd(f) : 'start'}_${t ? ymd(addDays(t, -1)) : ymd(new Date())}` : `${S.month.getFullYear()}-${pad(S.month.getMonth() + 1)}`;
-    return per + (S.q || S.ft.length ? '_filtered' : ''); })();
   const draw = () => {
     const shown = txs.slice(0, S.flowShow), groups = new Map();
     for (const t of shown) { const k = dayKey(new Date(t.occurred_at)); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(t); }
-    box.innerHTML = `<div style="display:flex;justify-content:flex-end;margin:-4px 0 -4px"><button type="button" class="linkbtn" id="flexport">⬇ 匯出這 ${txs.length} 筆（CSV）</button></div>` + [...groups].map(([k, list]) => {
+    box.innerHTML = [...groups].map(([k, list]) => {
       const d = new Date(list[0].occurred_at);
       const de = list.filter(t => t.kind === 'expense' && (acct(t.account_id)?.currency || 'TWD') === 'TWD').reduce((s, t) => s + +t.amount, 0);
       return `<div class="daygroup"><div class="dayhead"><span>${showYear ? d.getFullYear() + '/' : ''}${d.getMonth() + 1}/${d.getDate()}（${WD[d.getDay()]}）</span><span class="num">${de ? '支出 ' + money(de) : ''}</span></div>
@@ -1463,7 +1496,6 @@ async function viewFlow() {
     }).join('') + (txs.length > shown.length ? `<button class="btn ghost" id="more">再顯示 ${Math.min(300, txs.length - shown.length)} 筆（共 ${txs.length} 筆，已顯示 ${shown.length}）</button>`
       : txs.length > 300 || (S.q && !rangeMode && txs.length === 300) ? `<p class="hint" style="text-align:center">${S.q && !rangeMode && txs.length === 300 ? '只列出最近 300 筆符合的紀錄；改用「選擇區間」可以查更早的。' : `共 ${txs.length} 筆`}</p>` : '');
     bindRows(box, shown);
-    $('#flexport', box).onclick = () => exportTxs(txs, expLabel);
     const mb = $('#more', box); if (mb) mb.onclick = () => { S.flowShow += 300; draw(); };
   };
   box.style.display = 'flex'; box.style.flexDirection = 'column'; box.style.gap = '10px';
@@ -1495,10 +1527,31 @@ function exportTxs(txs, label) {
   downloadText(txCsv(sorted), `xiaxia_${label}.csv`);
   toast(`已匯出 ${txs.length} 筆`);
 }
-async function exportAll(btn) {
-  const old = btn.textContent; btn.disabled = true; btn.textContent = '匯出中…';
-  try { const txs = await fetchAll(() => sb.from('transactions').select(TX_COLS).eq('ledger_id', S.ledger.id).order('occurred_at').order('id')); exportTxs(txs, 'all_' + ymd(new Date())); }
-  catch (e) { fail(e); } finally { btn.disabled = false; btn.textContent = old; }
+// 匯出（電腦版，在設定裡）：選期間，預設今年
+function openExport() {
+  asPage('export', openExport);
+  S.exR ??= { pre: 'year' };
+  openSheet(`<div class="sheethead"><h2>匯出紀錄（CSV）</h2><button class="iconbtn" data-close aria-label="關閉">✕</button></div>
+    <div class="form"><div class="field"><label>期間</label>${rangeBar('ex', S.exR)}</div>
+      <p class="hint" id="excount" style="margin:0">計算筆數中…</p>
+      <button class="btn" id="exrun" disabled>匯出</button>
+      <p class="hint" style="margin:0">匯出成 Excel 可以開的 CSV 檔，包含日期、借貸、金額、帳戶、分類、專案、收付人、備註等欄位。大約每 1,000 筆 150 KB。</p></div>`, root => {
+    bindRangeBar(root, 'ex', S.exR, () => openExport());
+    const q = () => applyRange(sb.from('transactions').select(TX_COLS).eq('ledger_id', S.ledger.id), S.exR);
+    let n = null;
+    applyRange(sb.from('transactions').select('id', { count: 'exact', head: true }).eq('ledger_id', S.ledger.id), S.exR).then(r => {
+      n = r.count ?? null; const el = $('#excount', root); if (!el) return;
+      el.textContent = n == null ? '' : `共 ${n.toLocaleString()} 筆（約 ${Math.max(1, Math.round(n * 0.15))} KB）`;
+      $('#exrun', root).disabled = n === 0; if (n === 0) el.textContent = '這段期間沒有紀錄'; });
+    $('#exrun', root).onclick = async () => {
+      const b = $('#exrun', root); b.disabled = true; b.textContent = '匯出中…';
+      try {
+        const txs = await fetchAll(() => q().order('occurred_at').order('id'));
+        const [f, t] = rangeOf(S.exR);
+        exportTxs(txs, f || t ? `${f ? ymd(f) : 'start'}_${t ? ymd(addDays(t, -1)) : ymd(new Date())}` : 'all_' + ymd(new Date()));
+      } catch (e) { fail(e); } finally { b.disabled = false; b.textContent = '匯出'; }
+    };
+  });
 }
 
 /* ---------- 批次修改（電腦版流水） ---------- */
