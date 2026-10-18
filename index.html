@@ -13,10 +13,12 @@
 <style>
 /* Layout: 手機優先的單頁 App — 上方標題列、中間內容、下方分頁列＋記一筆按鈕、從下方滑出的表單 */
 :root{
-  --bg:#f4f5f8; --surface:#ffffff; --ink:#18202e; --muted:#69707f; --line:#dfe2ea;
-  --accent:#2a4d8f; --accent-ink:#ffffff; --accent-soft:#e6ecf8;
-  --exp:#23824f; --inc:#c8423b; --loan:#9a5b12; --loan-soft:#fbf0df;
-  --shadow:0 1px 2px rgba(24,32,46,.06),0 4px 16px rgba(24,32,46,.06);
+  /* 淺色：海軍藍 #3F679B／鋼藍 #74A2BC／霧綠 #CBDEDC／米白 #F2EFE8 */
+  --bg:#F2EFE8; --surface:#FFFFFF; --ink:#1C2A3A; --muted:#5C6773; --line:#E1E3DD;
+  --accent:#3F679B; --accent-ink:#FFFFFF; --accent-soft:#E3EEEC;
+  --exp:#2F6E54; --inc:#B8433A; --loan:#8A5A1E; --loan-soft:#F5EBDB;
+  --steel:#74A2BC; --sage:#CBDEDC;
+  --shadow:0 1px 2px rgba(28,42,58,.05),0 6px 18px rgba(28,42,58,.06);
   --f-body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
   --f-num:"DM Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
   color-scheme:light;
@@ -305,6 +307,21 @@ svg text{fill:var(--muted);font-size:11px;font-family:var(--f-body)}
 /* 彈出視窗開著時，後面的頁面不能捲動（用事件攔截，不改 overflow，避免頁面跳回頂端） */
 #sheet{overscroll-behavior:contain}
 .tblwrap,[style*="overflow-x:auto"]{overscroll-behavior-x:contain}
+
+/* ===== 淺色模式細節（深色模式不套用） ===== */
+@media not all and (prefers-color-scheme:dark){
+  :root:not([data-theme="dark"]) .num{font-weight:600}
+  :root:not([data-theme="dark"]) .row .dot{background:var(--accent-soft);color:var(--accent)}
+  :root:not([data-theme="dark"]) .seg{background:#E0E8E4}
+  :root:not([data-theme="dark"]) .recurbanner{background:#E4EDEA;border-color:#A9C6D3}
+}
+@media (min-width:1024px) and (prefers-color-scheme:light){
+  :root:not([data-theme="dark"]) nav.tabs{background:#EAE6DD;border-right-color:#DDD8CC}
+  :root:not([data-theme="dark"]) #sheet .panel{background:#F8F6F1}
+  :root:not([data-theme="dark"]) nav.tabs button[aria-current="page"]{background:var(--sage);color:var(--ink)}
+  :root:not([data-theme="dark"]) nav.tabs::before{color:var(--accent)}
+}
+:root[data-theme="light"] .num{font-weight:600}
 </style>
 </head>
 <body>
