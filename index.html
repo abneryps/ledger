@@ -277,7 +277,7 @@ svg text{fill:var(--muted);font-size:11px;font-family:var(--f-body)}
 /* ===== 桌機版（螢幕寬 1024px 以上才生效，手機不受影響） ===== */
 @media (min-width:1024px){
   :root{--side:220px;--dock:min(520px,40vw)}
-  #app{max-width:none;margin:0 0 0 var(--side);padding-bottom:40px;transition:margin-right .2s}
+  #app:has(> nav.tabs){max-width:none;margin:0 0 0 var(--side);padding-bottom:40px;transition:margin-right .2s}
   body.sheet-on #app{margin-right:var(--dock)}
   header.top{padding:18px 32px 12px}
   header.top h1{font-size:24px}
@@ -1180,7 +1180,7 @@ document.addEventListener('click', e => { SH.fromMain = !e.target.closest('#shee
 const asPage = (key, reopen) => { SH.next = { key, reopen }; };
 function sheetEnter(page) {
   // 桌機：從左邊主畫面點開的新內容直接取代右側面板，不疊上一層
-  if (isDesk() && SH.fromMain && SH.open) { SH.stack = []; SH.cur = null; }
+  if (isDesk() && SH.fromMain && SH.open && page) { SH.stack = []; SH.cur = null; }   // 只有開「頁面」才取代；表單疊在上面，存檔後回到原頁
   SH.fromMain = false;
   if (SH.open && SH.cur && (!page || page.key !== SH.cur.key)) SH.stack.push({ ...SH.cur, scroll: $('#sheetBody').parentElement.scrollTop });
   SH.cur = page || null;
