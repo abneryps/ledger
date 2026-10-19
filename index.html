@@ -3273,6 +3273,17 @@ function openForm({ mode, tx, loanType: lt0, cpId, accountId, side, invId, invLi
         const { error: e2 } = await sb.from('transactions').insert(rows); if (e2) return fail(e2);
         await reloadAll(); toast('已復原'); } } : null);
     };
+    // 電腦版新增紀錄：存檔後表單留著（同一個分頁、帳戶、分類、日期），清空金額和備註方便連續記帳
+    const afterSave = async msg => {
+      await reloadAll();
+      if (!(isDesk() && !tx)) { closeSheet(); toast(msg); return; }
+      Object.assign(st, { amount: '', to_amount: '', memo: '', memo2: '', memo2Touched: false, split: false, mine: '', payee: '', project: '', payeeNew: '', projectNew: '', more: false,
+        qty: '', price: '', fee: '', tax: '', total: '', cost: '', feeTouched: false, taxTouched: false, totalTouched: false, costTouched: false, fromTotal: false, stock: '', hold: null, posted: '' });
+      if (st.rec) st.rec.on = false;
+      const n = toLocalInput(new Date()); st.time = n.slice(11);
+      render(); toast(msg + '，可以繼續記下一筆', 2500);
+      setTimeout(() => { const a = g('famt') || g('fqty'); if (a) a.focus(); }, 60);
+    };
     const save = async () => {
       grab();
       const err = m => { const e = g('ferr'); e.textContent = m; e.scrollIntoView({ block: 'nearest' }); toast(m); };
@@ -3316,7 +3327,7 @@ function openForm({ mode, tx, loanType: lt0, cpId, accountId, side, invId, invLi
           if (tx) { const d = tx.split_id ? await sb.from('transactions').delete().eq('split_id', tx.split_id) : await sb.from('transactions').delete().eq('id', tx.id); if (d.error) throw d.error; }
           LS.set('splitCp', cp);
           if (st.splitPayer === 'me') { const last = LS.get('last', {}); last.expense = +st.acc; LS.set('last', last); }
-          await reloadAll(); closeSheet(); toast(tx ? '已更新分攤' : `已記下：我的份額 ${money(mine)}${st.splitPayer === 'me' && other > 0 ? `、${S.cpMap.get(cp)?.name || '對方'} 欠 ${money(other)}` : ''}`);
+          await afterSave(tx ? '已更新分攤' : `已記下：我的份額 ${money(mine)}${st.splitPayer === 'me' && other > 0 ? `、${S.cpMap.get(cp)?.name || '對方'} 欠 ${money(other)}` : ''}`);
           return;
         } else if (st.mode === 'expense' || st.mode === 'income') {
           if (!st.cat) return err('請選分類。');
@@ -3397,7 +3408,7 @@ function openForm({ mode, tx, loanType: lt0, cpId, accountId, side, invId, invLi
         else if (st.mode === 'expense' || st.mode === 'income') last[st.mode] = +st.acc;
         LS.set('last', last);
         const msg = wantRec ? (tx ? '已更新，並建立定期紀錄' : '已記下，並建立定期紀錄') : tx ? '已更新' : st.mode === 'invest' && st.side === 'day' ? `已記下當沖${st.dayPL === 'loss' ? '虧損' : '獲利'}` : st.mode === 'invest' && st.side === 'sell' ? `已記下，損益 ${money(calcInv().pl, acct(+st.cash)?.currency, true)}` : '已記下';
-        await reloadAll(); closeSheet(); toast(msg);
+        await afterSave(msg);
       } catch (er) { err(er.message || String(er)); }
     };
     // 存檔中鎖住按鈕，避免連按兩下記成兩筆
