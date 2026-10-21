@@ -268,7 +268,9 @@ input[type="date"]::-webkit-datetime-edit,input[type="datetime-local"]::-webkit-
 .formbtns .btn{flex:1}
 .selbar{position:fixed;left:0;right:0;bottom:calc(70px + env(safe-area-inset-bottom,0px));z-index:11;display:flex;justify-content:center;padding-inline:16px}
 .selbar div{background:var(--ink);color:var(--bg);border-radius:14px;padding:10px 12px 10px 16px;display:flex;gap:12px;align-items:center;box-shadow:var(--shadow);max-width:608px;width:100%}
-.selbar div span{flex:1}
+.selbar div span{flex:1;white-space:nowrap}
+.selbar div>*{white-space:nowrap;flex-shrink:0}
+.selbar div{flex-wrap:wrap;row-gap:8px}
 .selbar .btn{background:var(--accent);color:var(--accent-ink)}
 
 /* login */
@@ -1181,6 +1183,8 @@ function editRecur(id) {
 const SH = { open: false, cur: null, stack: [], next: null, fromMain: false };
 const DESK = matchMedia('(min-width:1024px)');
 const isDesk = () => DESK.matches;
+// 畫面寬度跨過電腦版門檻（開啟時視窗還在展開、平板旋轉、分割畫面）→ 流水重畫，勾選框才會出現或收起
+DESK.addEventListener('change', () => { if (!S.ledger || S.view !== 'flow') return; if (!isDesk()) { S.sel.clear(); updateSelbar(); } refresh(); });
 // 桌機：記住這次點擊是在左邊主畫面還是右側面板
 document.addEventListener('click', e => { SH.fromMain = !e.target.closest('#sheet'); }, true);
 const asPage = (key, reopen) => { SH.next = { key, reopen }; };
@@ -1619,26 +1623,43 @@ function batchCat(ids) {
     };
   });
 }
+// 改帳戶：一般收支改 account_id；投資買進改扣款帳戶（account_id）、賣出改入帳帳戶（to_account_id）
+// 投資那一端永遠不動，新帳戶也不能是投資帳戶
+// 沒有股數的「轉入投資／投資轉出」也一樣：只換不是投資帳戶的那一端
+const cashCol = t => {
+  if (batchOK(t)) return 'account_id';
+  if (!t || t.kind !== 'transfer' || t.day_trade) return null;
+  if (t.trade_side) return t.trade_side === 'buy' ? 'account_id' : 'to_account_id';
+  const iA = isInv(acct(t.account_id)), iB = isInv(acct(t.to_account_id));
+  return iB && !iA ? 'account_id' : iA && !iB ? 'to_account_id' : null;
+};
 function batchAcct(ids) {
-  const txs = ids.map(id => S.flowTxs?.get(id)).filter(Boolean), ok = txs.filter(batchOK);
+  const txs = ids.map(id => S.flowTxs?.get(id)).filter(Boolean), ok = txs.filter(t => cashCol(t));
+  const nTrade = ok.filter(t => t.kind === 'transfer').length;
   batchSheet(`把 ${ids.length} 筆改帳戶`, ok.length ? `
-    <div class="field"><label for="bacc">新帳戶</label><select id="bacc">${acctOptions(a => !isInv(a), null)}</select></div>
-    <p class="hint" id="bnote" style="margin:0"></p>` : '<p class="hint">選取的紀錄都不是一般支出或收入，沒有可以改帳戶的。</p>', root => {
+    <div class="field"><label for="bacc">${nTrade === ok.length ? '新的資金帳戶' : '新帳戶'}</label><select id="bacc">${acctOptions(a => !isInv(a), null)}</select></div>
+    ${nTrade ? '<p class="hint" style="margin:0">投資買賣、轉入投資只會改資金那一端（扣款或入帳的帳戶），股票／基金帳戶和成本不變。</p>' : ''}
+    <p class="hint" id="bnote" style="margin:0"></p>` : '<p class="hint">選取的紀錄都不是一般收支或投資相關的轉帳，沒有可以改帳戶的。</p>', root => {
     const sel = $('#bacc', root), note = $('#bnote', root), go = $('#bgo', root);
     if (!sel) { go.hidden = true; return; }
     // 幣別不同不能直接換（金額會變成另一種貨幣）
-    const plan = () => { const A = acct(+sel.value), hit = ok.filter(t => (acct(t.account_id)?.currency || 'TWD') === (A.currency || 'TWD') && t.account_id !== A.id);
-      const same = ok.filter(t => t.account_id === A.id).length, fx = ok.length - hit.length - same;
+    const plan = () => { const A = acct(+sel.value);
+      const cur = t => acct(t[cashCol(t)])?.currency || 'TWD';
+      const hit = ok.filter(t => !isInv(A) && cur(t) === (A.currency || 'TWD') && t[cashCol(t)] !== A.id);
+      const same = ok.filter(t => t[cashCol(t)] === A.id).length, fx = ok.length - hit.length - same;
       return { A, hit, skip: ids.length - hit.length, same, fx, other: ids.length - ok.length }; };
     const show = () => { const { hit, same, fx, other } = plan();
-      note.textContent = `會改 ${hit.length} 筆` + ([same && `${same} 筆本來就是這個帳戶`, fx && `${fx} 筆幣別不同`, other && `${other} 筆是轉帳、投資等，請個別修改`].filter(Boolean).map((x, i) => (i ? '、' : '；略過：') + x).join('')) + '。'; };
+      note.textContent = `會改 ${hit.length} 筆` + ([same && `${same} 筆本來就是這個帳戶`, fx && `${fx} 筆幣別不同`, other && `${other} 筆是轉帳、當沖等，請個別修改`].filter(Boolean).map((x, i) => (i ? '、' : '；略過：') + x).join('')) + '。'; };
     sel.onchange = show; show();
     $('#bf', root).onsubmit = async e => { e.preventDefault();
       const { A, hit, skip } = plan(); if (!hit.length) { $('#berr', root).textContent = '沒有可以改的紀錄。'; return; }
+      if (isInv(A)) { $('#berr', root).textContent = '不能改成投資帳戶。'; return; }
       go.disabled = true;
+      const fromIds = hit.filter(t => cashCol(t) === 'account_id').map(t => t.id), toIds = hit.filter(t => cashCol(t) === 'to_account_id').map(t => t.id);
       const row = { account_id: A.id }; if (!isCard(A)) row.posted_on = null;   // 不是信用卡就不需要入帳日
-      const r = await sb.from('transactions').update(row).in('id', hit.map(t => t.id));
-      if (r.error) { go.disabled = false; $('#berr', root).textContent = r.error.message; return; }
+      let r = fromIds.length ? await sb.from('transactions').update(row).in('id', fromIds) : {};
+      if (!r.error && toIds.length) r = await sb.from('transactions').update({ to_account_id: A.id }).in('id', toIds);
+      if (r.error) { go.disabled = false; $('#berr', root).textContent = r.error.message; if (fromIds.length && toIds.length) await reloadAll(); return; }
       batchDone(hit.length, skip, A.name);
     };
   });
