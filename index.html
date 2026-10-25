@@ -7,6 +7,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="記帳本">
 <title>蝦蝦記帳</title>
+<link rel="icon" type="image/png" sizes="32x32" href="img/icon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="img/icon-192.png">
+<link rel="apple-touch-icon" href="img/icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=DM+Mono:wght@500&display=swap">
@@ -277,6 +280,13 @@ input[type="date"]::-webkit-datetime-edit,input[type="datetime-local"]::-webkit-
 .login{max-width:380px;margin:0 auto;padding:calc(48px + env(safe-area-inset-top,0px)) 16px 32px;display:flex;flex-direction:column;gap:18px}
 .login h1{font-size:28px;margin:0}
 .login p{margin:0;color:var(--muted)}
+.login .mascot{display:block;width:150px;height:150px;margin:0 auto -6px}
+/* 蝦蝦插圖：分頁列圖示、空狀態、記一筆 */
+nav.tabs button img.navimg{width:26px;height:26px;opacity:.55;filter:saturate(.35);transition:opacity .15s,filter .15s}
+nav.tabs button[aria-current="page"] img.navimg{opacity:1;filter:none}
+.empty .ill{display:block;width:140px;height:140px;margin:0 auto 6px}
+.sheethead .hd{display:flex;align-items:center;gap:8px}
+.sheethead .hd img{width:44px;height:44px;margin:-6px 0}
 .toastbtn{margin-left:10px;background:none;border:0;color:var(--accent-soft);font:inherit;font-weight:700;text-decoration:underline;cursor:pointer;padding:0}
 #toast{position:fixed;left:50%;top:calc(14px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:30;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:14px;max-width:calc(100% - 32px);box-shadow:var(--shadow)}
 .spinner{padding:40px;text-align:center;color:var(--muted)}
@@ -722,6 +732,7 @@ let OFFLINE = false;
 function renderLogin(mode = 'in', msg = '') {
   $('#app').innerHTML = `
   <div class="login">
+    <img class="mascot" src="img/login-shrimp.webp" alt="" width="150" height="150">
     <div><h1>蝦蝦記帳</h1><p>登入後，手機和電腦看到的是同一本帳。</p></div>
     ${OFFLINE ? `<div class="card" style="box-shadow:none;border:1px solid var(--line)"><p style="color:var(--ink)">目前連不到資料庫，可能是在預覽視窗裡開啟。</p><p class="hint" style="margin-top:6px">可以先用範例資料試用所有功能，資料都是假的，不會存到你的帳本。</p><button class="btn" id="demo2" style="margin-top:12px;width:100%">用範例資料預覽</button><button class="btn ghost" id="demo3" style="margin-top:8px;width:100%">預覽新使用者的空白帳本</button></div>` : ''}
     <div class="seg" role="group">
@@ -815,6 +826,9 @@ const ICONS = {
   report: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 20V11M12 20V5M19 20v-7"/></svg>',
   invest: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 18l5-6 4 3 7-9"/><path d="M15 6h5v5"/></svg>',
 };
+const NAVIMG = { flow: 'nav-flow', accts: 'nav-accounts', invest: 'nav-invest', report: 'nav-reports', proj: 'nav-projects', payee: 'nav-payees' };
+const navIcon = v => `<img class="navimg" src="img/${NAVIMG[v]}.webp" alt="" width="26" height="26">`;
+const ill = (n) => `<img class="ill" src="img/${n}.webp" alt="" width="140" height="140" loading="lazy">`;
 const TITLES = { proj: '專案', payee: '收付人', flow: '流水', accts: '帳戶', loans: '借貸對象', invest: '投資', report: '損益表' };
 function renderShell() {
   $('#app').innerHTML = `
@@ -822,10 +836,10 @@ function renderShell() {
     <main id="view"></main>
     <div class="selbar" id="selbar" hidden><div><span id="selcount"></span><button class="linkbtn" id="selall" style="color:inherit">全選</button><button class="btn small" id="selcat">改分類</button><button class="btn small" id="selacct">改帳戶</button><button class="btn small" id="selproj">改專案</button><button class="btn small" id="selpayee">改收付人</button><button class="btn small" id="selassign">指定對象</button><button class="linkbtn" id="selclear" style="color:inherit">取消</button></div></div>
     <nav class="tabs">
-      ${['flow', 'accts'].map(v => `<button data-v="${v}">${ICONS[v]}${TITLES[v]}</button>`).join('')}
+      ${['flow', 'accts'].map(v => `<button data-v="${v}">${navIcon(v)}${TITLES[v]}</button>`).join('')}
       <button class="fab" id="fab" aria-label="記一筆"><span>＋</span>記一筆</button>
-      ${['invest', 'report'].map(v => `<button data-v="${v}">${ICONS[v]}${v === 'report' ? '報表' : TITLES[v]}</button>`).join('')}
-      ${['proj', 'payee'].map(v => `<button data-v="${v}" class="deskonly">${ICONS[v]}${TITLES[v]}</button>`).join('')}
+      ${['invest', 'report'].map(v => `<button data-v="${v}">${navIcon(v)}${v === 'report' ? '報表' : TITLES[v]}</button>`).join('')}
+      ${['proj', 'payee'].map(v => `<button data-v="${v}" class="deskonly">${navIcon(v)}${TITLES[v]}</button>`).join('')}
     </nav>`;
   $$('nav.tabs [data-v]').forEach(b => b.onclick = () => go(b.dataset.v));
   $('#back').onclick = () => go('accts');
@@ -1513,7 +1527,7 @@ async function viewFlow() {
   }
   const box = $('#days');
   if (!box) return;
-  if (!txs.length) { box.innerHTML = `<div class="card empty">${S.q || S.ft.length ? '找不到符合的紀錄。' : rangeMode ? '這段期間沒有紀錄。' : '這個月還沒有紀錄。按下方「記一筆」開始。'}</div>`; return; }
+  if (!txs.length) { box.innerHTML = `<div class="card empty">${S.q || S.ft.length ? '找不到符合的紀錄。' : rangeMode ? ill('empty-jar') + '這段期間沒有紀錄。' : ill('empty-jar') + '這個月還沒有紀錄。按下方「記一筆」開始。'}</div>`; return; }
   const showYear = S.q || (rangeMode && new Date(txs[0].occurred_at).getFullYear() !== new Date(txs[txs.length - 1].occurred_at).getFullYear());
   S.flowTxs = new Map(txs.map(t => [t.id, t]));
   const draw = () => {
@@ -2422,7 +2436,7 @@ function namedListHtml(k, st, inCard) {
       return `<div class="row ${x.hidden ? 'ishidden' : ''}" data-nl="${x.id}" role="button" tabindex="0"><span class="dot">${esc([...x.name][0])}</span>
         <span class="main"><span class="t">${esc(x.name)}</span><span class="s">${e.n} 筆${x.hidden ? '・已隱藏' : ''}${x.memo ? ' · ' + esc(x.memo) : ''}</span></span>
         <span class="amt">${e.e ? `<span class="num exp">${money(e.e)}</span><small>支出</small>` : ''}</span></div>`; }).join('')}</div>`
-      : `<div class="${inCard ? '' : 'card '}empty">還沒有${N.label}。按「＋ 新增${N.label}」，或記一筆時在「收付人・專案」選「＋ 新增」。</div>`}
+      : `<div class="${inCard ? '' : 'card '}empty">${inCard ? '' : ill(k === 'payee' ? 'empty-payees' : 'empty-projects')}還沒有${N.label}。按「＋ 新增${N.label}」，或記一筆時在「收付人・專案」選「＋ 新增」。</div>`}
     <p class="hint" style="margin:0 4px">金額是台幣帳戶的支出合計。點進去可以看明細、改名、隱藏或刪除。</p>`;
 }
 function bindNamedList(k, root) {
@@ -2726,7 +2740,7 @@ async function viewInvest() {
     ${held.length ? `<div class="list">${held.map(({ a, cost, p }) => `<button class="row" data-acct="${a.id}"><span class="main"><span class="t">${esc(a.name)}</span>
       <span class="s">${p.shares == null ? '股數未記錄' : qf.format(p.shares) + ' 股'}${p.shares > 0 ? '・均價 ' + money(cost / p.shares, a.currency) : ''}</span></span>
       <span class="amt"><span class="num">${money(cost, a.currency)}</span>${p.realized ? `<small class="${p.realized > 0 ? 'inc' : 'exp'}">已實現 ${money(p.realized, a.currency, true)}</small>` : ''}</span></button>`).join('')}</div>`
-      : '<div class="card empty">目前沒有持有部位。按「買進」記第一筆。</div>'}
+      : `<div class="card empty">${ill('empty-invest')}目前沒有持有部位。按「買進」記第一筆。</div>`}
     <div class="sectionhead"><h2>最近買賣</h2></div>
     <div id="trades"><div class="spinner">載入中…</div></div>`;
   $$('[data-side]', v).forEach(b => b.onclick = () => openForm({ mode: 'invest', side: b.dataset.side }));
@@ -3149,7 +3163,7 @@ function openForm({ mode, tx, loanType: lt0, cpId, accountId, side, invId, invLi
     const showAmt = st.mode !== 'invest' && !(st.mode === 'other' && tx?.trade_side);
     const sbody = $('#sheetBody'), keepTop = [sbody.scrollTop, sbody.parentElement.scrollTop];
     $('#sheetBody').innerHTML = `
-      <div class="sheethead"><h2>${tx ? '編輯紀錄' : copy ? '複製紀錄' : '記一筆'}</h2><button class="iconbtn" data-close aria-label="關閉">✕</button></div>
+      <div class="sheethead"><div class="hd">${tx ? '' : '<img src="img/shrimp-writing.webp" alt="" width="44" height="44">'}<h2>${tx ? '編輯紀錄' : copy ? '複製紀錄' : '記一筆'}</h2></div><button class="iconbtn" data-close aria-label="關閉">✕</button></div>
       <form class="form" id="txf" novalidate>
         ${st.mode === 'other' ? '' : `<div class="seg tabs5" role="group">${tabs.map(([k, n]) => `<button type="button" data-mode="${k}" aria-pressed="${st.mode === k}">${n}</button>`).join('')}</div>`}
         <div class="two" id="fdates"><div class="field"><label for="fwhen">${st.mode === 'other' ? '日期' : '消費日'}</label><input id="fwhen" type="date" value="${st.when}"></div>
