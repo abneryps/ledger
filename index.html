@@ -369,7 +369,10 @@ header.top .logo{width:34px;height:34px;flex:none}
 .recurbanner::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--gold);flex:none}
 .recurbanner .go{margin-left:auto;color:var(--sea)}
 .flowsum{position:relative;overflow:hidden;background:var(--sea-soft);box-shadow:none}
-.flowsum .summary{padding-right:64px}
+.flowsum .summary{padding-right:0}
+.flowsum .extra{padding-right:72px}
+.summary .num{white-space:nowrap;overflow-wrap:normal;font-size:clamp(13px,4.1vw,18px)}
+.flowsum .summary,.flowsum .monthbar{position:relative;z-index:1}
 .flowsum .monthbar button{color:var(--sea-ink)}
 .flowsum .summary small{color:color-mix(in srgb,var(--ink) 70%,var(--sea-soft))}
 .flowsum .peek{position:absolute;right:-14px;bottom:-18px;width:92px;height:92px;pointer-events:none}
