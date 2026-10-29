@@ -104,6 +104,8 @@ nav.tabs button.deskonly{display:none}
 .search .btn{flex:none}
 .daygroup{display:flex;flex-direction:column}
 .dayhead{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);padding:6px 4px}
+.daysum{display:flex;gap:12px;white-space:nowrap}
+.daysum .num{margin-left:4px}
 .list{background:var(--surface);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
 .row{display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--line);width:100%;text-align:left;background:none;border-left:0;border-right:0;border-top:0}
 .row:last-child{border-bottom:0}
@@ -1619,8 +1621,9 @@ async function viewFlow() {
     for (const t of shown) { const k = dayKey(new Date(t.occurred_at)); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(t); }
     box.innerHTML = [...groups].map(([k, list]) => {
       const d = new Date(list[0].occurred_at);
-      const de = list.filter(t => t.kind === 'expense' && (acct(t.account_id)?.currency || 'TWD') === 'TWD').reduce((s, t) => s + +t.amount, 0);
-      return `<div class="daygroup"><div class="dayhead"><span>${showYear ? d.getFullYear() + '/' : ''}${d.getMonth() + 1}/${d.getDate()}（${WD[d.getDay()]}）</span><span class="num">${de ? '支出 ' + money(de) : ''}</span></div>
+      const tw = t => (acct(t.account_id)?.currency || 'TWD') === 'TWD', sumK = k => list.filter(t => t.kind === k && tw(t)).reduce((s, t) => s + +t.amount, 0);
+      const de = sumK('expense'), di = sumK('income');
+      return `<div class="daygroup"><div class="dayhead"><span>${showYear ? d.getFullYear() + '/' : ''}${d.getMonth() + 1}/${d.getDate()}（${WD[d.getDay()]}）</span><span class="daysum">${de ? `支出 <span class="num exp">${money(de)}</span>` : ''}${di ? `收入 <span class="num inc">${money(di)}</span>` : ''}</span></div>
         <div class="list">${list.map(t => txRow(t, { selectable: isDesk() })).join('')}</div></div>`;
     }).join('') + (txs.length > shown.length ? `<button class="btn ghost" id="more">再顯示 ${Math.min(300, txs.length - shown.length)} 筆（共 ${txs.length} 筆，已顯示 ${shown.length}）</button>`
       : txs.length > 300 || (S.q && !rangeMode && txs.length === 300) ? `<p class="hint" style="text-align:center">${S.q && !rangeMode && txs.length === 300 ? '只列出最近 300 筆符合的紀錄；改用「選擇區間」可以查更早的。' : `共 ${txs.length} 筆`}</p>` : '');
