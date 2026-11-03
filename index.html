@@ -119,6 +119,7 @@ nav.tabs button.deskonly{display:none}
 .row .s{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .row .amt{flex:none;text-align:right;font-size:15px}
 .row .amt small{display:block;font-size:11px;color:var(--muted);font-family:var(--f-body)}
+.row .amt small.inc{color:var(--inc)} .row .amt small.exp{color:var(--exp)}
 .row input[type=checkbox]{width:20px;height:20px;flex:none;accent-color:var(--accent)}
 .sectionhead{display:flex;justify-content:space-between;align-items:baseline;padding:4px 4px 0}
 .sectionhead h2{font-size:14px;margin:0;color:var(--muted);font-weight:500;letter-spacing:.06em}
@@ -1378,7 +1379,7 @@ function journal(t) {
 function txRow(t, { showDate = false, selectable = false, accountId = null, person = false, prev = null } = {}) {
   const A = acct(t.account_id), B = acct(t.to_account_id), lt = loanType(t);
   const cp = t.counterparty_id ? S.cpMap.get(t.counterparty_id) : null;
-  let title, cls, dot, amtHtml;
+  let title, cls, dot, amtHtml, plHtml = '', plainAmt = false;
   const d = new Date(t.occurred_at);
   const when = showDate ? '' : `${pad(d.getHours())}:${pad(d.getMinutes())}`;
   // 有日期的清單（帳戶明細、投資紀錄…）：左側日期欄，同一天的後續紀錄顯示「〃」
@@ -1396,8 +1397,9 @@ function txRow(t, { showDate = false, selectable = false, accountId = null, pers
     else {
       const pl = (t.to_amount ?? t.amount) - t.amount;
       title = `賣出 · ${inv?.name || ''}${q}${t.unit_price != null ? ' @' + qf.format(t.unit_price) : ''}`; dot = '賣'; cls = pl >= 0 ? 'inc' : 'exp';
-      amount = Math.abs(pl); sign = pl > 0 ? '+' : pl < 0 ? '−' : ''; cur = A?.currency;
-      title += '　損益';
+      // 主金額顯示實際入帳（賣出所得），損益另列一行
+      amount = t.to_amount ?? t.amount; sign = ''; cur = B?.currency || A?.currency; plainAmt = true;
+      plHtml = `<small class="num ${pl > 0 ? 'inc' : pl < 0 ? 'exp' : ''}">損益 ${pl > 0 ? '+' : pl < 0 ? '−' : ''}${nf.format(Math.abs(pl))}</small>`;
     }
   } else if (lt) {
     const L = LOAN[lt], mine = L.dir === 'out' ? A : B;
@@ -1423,8 +1425,8 @@ function txRow(t, { showDate = false, selectable = false, accountId = null, pers
   if (linkedDiv) { amount = +t.amount; cur = acct(t.account_id)?.currency; sign = t.amount < 0 ? '−' : '+'; }
   else if (accountId != null) { const dl = deltaFor(t, accountId); amount = Math.abs(dl); cur = acct(accountId)?.currency; sign = dl < 0 ? '−' : dl > 0 ? '+' : ''; }
   if (person) { const pd = personDelta(t)[0]; if (pd) { amount = Math.abs(pd[1]); cur = pd[0]; sign = pd[1] > 0 ? '+' : '−'; } }
-  const amtCls = cls === 'tr' ? '' : cls;
-  amtHtml = `<span class="num ${amtCls}">${+amount ? sign : ''}${CUR_SIGN[cur] ?? (cur ? cur + ' ' : '')}${nf.format(Math.abs(amount))}</span>${when ? `<small>${when}${postTag ? ' 消費' : ''}</small>` : ''}${postTag}`;
+  const amtCls = cls === 'tr' || (plainAmt && accountId == null && !person) ? '' : cls;
+  amtHtml = `<span class="num ${amtCls}">${+amount ? sign : ''}${CUR_SIGN[cur] ?? (cur ? cur + ' ' : '')}${nf.format(Math.abs(amount))}</span>${plHtml}${when ? `<small>${when}${postTag ? ' 消費' : ''}</small>` : ''}${postTag}`;
   const pj = nlName('proj', t.project_id);
   const memo = [nlName('payee', t.payee_id), pj && '#' + pj, t.memo].filter(Boolean).map(x => ` · ${esc(x)}`).join('');
   return `<div class="row" data-tx="${t.id}" role="button" tabindex="0">
